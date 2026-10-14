@@ -1,0 +1,44 @@
+name: Recruitment app release
+on:
+  push:
+    tags: ['recruitment-v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alkynes-recruitment-codex
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: alkynes-recruitment-codex/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - name: Set release version
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          const info = JSON.parse(fs.readFileSync('portable/version.json'));
+          info.version = process.env.GITHUB_REF_NAME.replace(/^recruitment-v/, '');
+          if (!/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(info.version)) throw Error('Invalid release tag');
+          fs.writeFileSync('portable/version.json', JSON.stringify(info));
+          JS
+      - run: npm run build
+        env:
+          ALKYNES_STATIC_EXPORT: '1'
+      - name: Prepare update assets
+        run: |
+          mkdir -p release-input
+          cp portable/*.cjs portable/version.json release-input/
+          cp -r out release-input/site
+          node scripts/package-update.cjs release-input release
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/alkynes-update.json release/alkynes-update.json.gz --title "채용관리 ${GITHUB_REF_NAME#recruitment-v}" --generate-notes
