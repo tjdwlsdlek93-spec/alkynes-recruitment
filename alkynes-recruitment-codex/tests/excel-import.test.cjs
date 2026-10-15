@@ -294,3 +294,35 @@ test('aptitude schedule imports from Excel, manual completion survives reimport,
   data.requests.find(q => q.id === request.id).examStatus = '잘못된상태';
   assert.equal(validateData(data), false);
 });
+
+
+test('dashboard and calendar honor terminal outcomes while preserving completed interviews and genuine unresolved records', () => {
+  const { activeInterview, interviewGroup } = load('interview-state');
+  const data = seedData(), person = data.candidates.find(c => c.id === data.interviews[0].candidateId), interview = data.interviews[0];
+  person.status = '확인 필요'; person.excelStage = '전형종료'; person.excelFinal = '입사포기';
+  interview.status = '확인 필요'; interview.verification = '선발 단계 확인 필요';
+  assert.equal(activeInterview(data, interview), false);
+  assert.equal(interviewGroup(data, interview), 'cancelled');
+  const event = calendarEvents(data).find(e => e.id === 'interview-' + interview.id);
+  assert.equal(event.status, '전형 종료 · 입사포기'); assert.equal(event.timing, '');
+  interview.status = '면접완료';
+  assert.equal(interviewGroup(data, interview), 'completed');
+  assert.equal(calendarEvents(data).find(e => e.id === event.id).status, '면접완료');
+  assert.equal(calendarEvents(data).find(e => e.id === event.id).timing, '');
+  person.excelFinal = ''; interview.status = '확인 필요';
+  assert.equal(interviewGroup(data, interview), 'cancelled');
+  person.excelStage = ''; person.status = '확인 필요';
+  assert.equal(activeInterview(data, interview), true);
+  assert.equal(interviewGroup(data, interview), 'review');
+});
+
+
+test('a later unresolved request row cannot erase an explicit terminal stage', async () => {
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(await sample());
+  const sheet = book.getWorksheet('채용프로세스 적시성');
+  sheet.getRow(7).getCell(12).value = '전형종료'; sheet.getRow(7).getCell(13).value = '미확정';
+  sheet.getRow(9).getCell(12).value = '확인 필요'; sheet.getRow(9).getCell(13).value = '미확정';
+  const plan = await parseExcel(await book.xlsx.writeBuffer(), 'terminal.xlsx');
+  const person = plan.candidates.find(c => c.name === '테스트갑');
+  assert.equal(person.status, '전형종료'); assert.equal(person.excelStage, '전형종료');
+});

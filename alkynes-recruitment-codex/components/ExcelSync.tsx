@@ -12,7 +12,7 @@ import { Modal } from './Forms';
 import { parseExcel, applyExcelSnapshot, type ExcelPlan } from '@/lib/excel';
 import { download, formatDate } from '@/lib/recruitment';
 const META = 'alkynes.excelSync.v1';
-const IMPORT_SCHEMA = 2;
+const IMPORT_SCHEMA = 3;
 const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {

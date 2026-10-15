@@ -244,11 +244,13 @@ export async function parseExcel(
         '입사확정',
         '입사포기',
         '지원포기',
+        '전형종료',
         '확인 필요',
         '실제 입사',
       ];
+      const resolvedCurrent = (!current || current.replace(/\s/g, '') === '확인필요') && old?.excelStage?.replace(/\s/g, '') === '전형종료' ? old?.excelStage || current : current;
       const resolvedFinal = finalStatus(final) ? final : finalStatus(old?.excelFinal) ? old!.excelFinal! : final || old?.excelFinal || '';
-      const status = candidateStatus({ status: known.includes(current) ? current as Candidate['status'] : old?.status || '확인 필요', excelFinal: resolvedFinal, actualJoin: actualJoin || old?.actualJoin });
+      const status = candidateStatus({ status: known.includes(resolvedCurrent) ? resolvedCurrent as Candidate['status'] : old?.status || '확인 필요', excelStage: resolvedCurrent, excelFinal: resolvedFinal, actualJoin: actualJoin || old?.actualJoin });
       const notes = [old?.notes, '원본 ' + n + '행: ' + (note || '메모 없음')]
         .filter(Boolean)
         .join('\n');
@@ -266,7 +268,7 @@ export async function parseExcel(
         }),
         status,
         notes,
-        excelStage: current,
+        excelStage: resolvedCurrent,
         excelFinal: resolvedFinal,
         expectedJoin: expectedJoin || old?.expectedJoin || '',
         actualJoin: actualJoin || old?.actualJoin || '',

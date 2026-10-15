@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { activeInterview } from '@/lib/interview-state';
+import { endedCandidate } from '@/lib/candidate-state';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Empty } from '@/components/Forms';
 import { koreaDate } from '@/lib/scheduling';
@@ -23,12 +25,12 @@ export default function Dashboard() {
   ).sort((a, b) => latestRequest(data, b.id).localeCompare(latestRequest(data, a.id)));
   const thisWeek = data.interviews.filter(
     (i) =>
-      ['면접예정', '확인 필요'].includes(i.status) &&
+      activeInterview(data, i) && ['면접예정', '확인 필요'].includes(i.status) &&
       new Date(i.startsAt) >= start &&
       new Date(i.startsAt) < end,
   );
   const month = today.slice(0, 7);
-  const hired = data.candidates.filter(c => !c.excelMissing && c.expectedJoin && koreaDate(c.expectedJoin).startsWith(month) && ['입사확정', '이번 달 실제 입사', '최종합격'].includes(c.status)).length;
+  const hired = data.candidates.filter(c => !c.excelMissing && c.expectedJoin && koreaDate(c.expectedJoin).startsWith(month) && ['입사확정', '실제 입사', '최종합격'].includes(c.status)).length;
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-teal-100 bg-gradient-to-r from-teal-50 via-white to-sky-50 p-7 sm:p-9">
@@ -83,13 +85,13 @@ export default function Dashboard() {
           <tbody>
             {active.map((r) => {
               const people = data.candidates.filter(
-                  (c) => c.requisitionId === r.id,
+                  (c) => c.requisitionId === r.id && !c.excelMissing && !endedCandidate(c),
                 ),
                 ids = people.map((c) => c.id);
               const upcoming = data.interviews
                 .filter(
                   (i) =>
-                    ids.includes(i.candidateId) &&
+                    activeInterview(data, i) && ids.includes(i.candidateId) &&
                     ['면접예정', '확인 필요'].includes(i.status) &&
                     Date.parse(i.startsAt) >= Date.now(),
                 )
@@ -98,7 +100,7 @@ export default function Dashboard() {
                 )[0];
               const pending = data.interviews.filter(
                 (i) =>
-                  ids.includes(i.candidateId) &&
+                  activeInterview(data, i) && ids.includes(i.candidateId) &&
                   i.status !== '취소' &&
                   i.interviewers.some(
                     (name) =>

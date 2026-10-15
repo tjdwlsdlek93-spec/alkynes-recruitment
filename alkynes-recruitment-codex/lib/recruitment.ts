@@ -27,6 +27,7 @@ export const candidateStatuses = [
   '입사확정',
   '입사포기',
   '지원포기',
+  '전형종료',
   '확인 필요',
   '실제 입사',
 ] as const;

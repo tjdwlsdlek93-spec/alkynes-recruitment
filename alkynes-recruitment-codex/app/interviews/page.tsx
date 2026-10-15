@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { interviewGroup } from '@/lib/interview-state';
+import { MessageLauncher } from '@/components/MessageLauncher';
 import { ShareMessage } from '@/components/ShareMessage';
 import { interviewMessage } from '@/lib/messages';
 import { candidateStatus, endedCandidate } from '@/lib/candidate-state';
@@ -121,13 +123,7 @@ export default function Page() {
       download('면접안내.txt', text, 'text/plain;charset=utf-8');
     }
   }
-  function classify(i: Interview) {
-    if (i.status === '면접완료') return 'completed';
-    const person = data.candidates.find(c => c.id === i.candidateId);
-    if (i.status === '취소' || (person && endedCandidate(person))) return 'cancelled';
-    if (i.status === '확인 필요' || Date.parse(i.startsAt) < Date.now()) return 'review';
-    return 'scheduled';
-  }
+  const classify = (i: Interview) => interviewGroup(data, i);
   const scope = data.interviews.filter(i => {
     const person = data.candidates.find(c => c.id === i.candidateId);
     return (!candidate || i.candidateId === candidate) && (!job || person?.requisitionId === job);
@@ -146,14 +142,9 @@ export default function Page() {
             예정·완료 일정을 채용공고별로 확인합니다. 날짜가 지났어도 완료가 확인되지 않은 면접은 확인 필요로 표시합니다.
           </p>
         </div>
-        <button
-          className="btn-primary"
-          disabled={!data.candidates.length}
-          onClick={() => setEditing(null)}
-        >
-          + 면접 일정 등록
-        </button>
       </div>
+      <div className="flex flex-wrap items-center gap-3"><MessageLauncher kind="면접" records={data.interviews.filter(i => classify(i) !== 'cancelled').map(i => ({ id: i.id, label: (data.candidates.find(c => c.id === i.candidateId)?.name || '미지정') + ' · ' + formatDate(i.startsAt) + ' · ' + i.status, generate: audience => interviewMessage(data, i, audience) }))} /><span className="text-sm text-slate-500">공유 가능한 일정 {data.interviews.filter(i => classify(i) !== 'cancelled').length}건 · 기록이 없으면 예시를 확인할 수 있습니다.</span></div>
+      <p className="text-sm text-slate-500">안내문은 각 면접 카드의 「카톡 안내문」 버튼에서 확인합니다. 일정이 없다면 엑셀 연동 후 분류·공고 필터를 확인하세요.</p>
       <div className="segmented w-fit max-w-full flex-wrap" role="group" aria-label="면접 일정 분류">
         {([['scheduled', '예정'], ['review', '확인 필요'], ['completed', '완료'], ['cancelled', '취소']] as const).map(([key, label]) => <button key={key} aria-pressed={group === key} className={group === key ? 'selected' : ''} onClick={() => setGroup(key)}>{label}<span>{scope.filter(i => classify(i) === key).length}</span></button>)}
       </div>

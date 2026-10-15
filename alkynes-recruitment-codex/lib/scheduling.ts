@@ -1,3 +1,5 @@
+import { interviewGroup } from './interview-state';
+import { candidateStatus, endedCandidate } from './candidate-state';
 import type { RecruitmentData, ProcessRequest } from './recruitment';
 export function koreaDate(value = new Date().toISOString()) {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -50,8 +52,8 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
       date: koreaDate(i.startsAt),
       time: time(i.startsAt),
       title: labels(c?.requisitionId || '', i.candidateId) + ' 면접',
-      status: i.status,
-      timing: i.verification || '',
+      status: interviewGroup(data, i) === 'cancelled' ? (c && endedCandidate(c) ? '전형 종료 · ' + candidateStatus(c) : '취소·종결') : i.status,
+      timing: interviewGroup(data, i) === 'cancelled' || (c && endedCandidate(c)) ? '' : i.verification || '',
       href: '/interviews?candidate=' + i.candidateId,
     };
   });
@@ -77,7 +79,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
     if (q.stage === '인적성 검사 요청' && q.examAt && q.status !== '취소') events.push({
       id: 'aptitude-' + q.id, date: koreaDate(q.examAt), time: time(q.examAt),
       title: labels(q.requisitionId, q.candidateId) + ' 인적성 검사 · ' + q.round + '회차',
-      status: q.examStatus || '검사예정', timing: '', href: '/aptitudes',
+      status: data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) ? '전형 종료' : q.examStatus || '검사예정', timing: '', href: '/aptitudes',
     });
     if (q.receivedAt)
       events.push({
@@ -92,7 +94,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
           q.round +
           '회차',
         status: q.status,
-        timing: requestTiming(q),
+        timing: data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) ? '전형 종료' : requestTiming(q),
         href: '/requests?request=' + q.id,
       });
     if (q.status === '요청 전' && q.dueAt)
@@ -102,7 +104,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
         time: time(q.dueAt),
         title: labels(q.requisitionId, q.candidateId) + ' ' + q.stage + ' 마감',
         status: q.status,
-        timing: requestTiming(q),
+        timing: data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) ? '전형 종료' : requestTiming(q),
         href: '/requests?request=' + q.id,
       });
   }

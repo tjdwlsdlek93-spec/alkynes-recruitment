@@ -82,7 +82,7 @@ export default function Page() {
           <div className="mb-4 text-xs font-semibold tracking-[0.22em] text-teal-200">ALKYNES · RECRUITMENT</div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">좋은 동료를 만나는 시작</h1>
           <p className="mt-4 text-sm leading-7 text-slate-200">채용 요청부터 새로운 동료의 합류까지,<br />지금 필요한 채용을 한눈에 확인하세요.</p>
-          <button className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-900 shadow-sm hover:bg-teal-50" onClick={() => setEditing(null)}>+ 채용 요청 등록</button>
+          <p className="mt-6 text-sm text-teal-100">채용 요청은 엑셀에서 등록·관리합니다.</p>
         </div>
         <div aria-hidden="true" className="hero-art"><div className="hero-orbit"/><div className="hero-paper"><div className="hero-avatar">✦</div><div className="hero-line"/><div className="hero-line short"/><div className="hero-check">✓</div></div><span className="hero-dot"/></div>
       </section>
