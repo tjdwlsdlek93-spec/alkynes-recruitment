@@ -1,4 +1,5 @@
 import './globals.css';
+import { SidebarUpdateActions } from '@/components/SidebarUpdateActions';
 import { Sidebar } from '@/components/Sidebar';
 import { ExcelSyncProvider } from '@/components/ExcelSync';
 import { RecruitmentProvider } from '@/components/RecruitmentProvider';
@@ -17,7 +18,7 @@ export default function RootLayout({
         <Sidebar />
         <main className="min-h-screen p-4 md:ml-64 md:p-8">
           <RecruitmentProvider>
-            <ExcelSyncProvider>{children}</ExcelSyncProvider>
+            <ExcelSyncProvider><SidebarUpdateActions />{children}</ExcelSyncProvider>
           </RecruitmentProvider>
         </main>
       </body>

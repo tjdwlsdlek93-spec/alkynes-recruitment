@@ -26,7 +26,7 @@ type SyncContextValue = {
   working: boolean;
   preview: (path: string) => Promise<void>;
   pause: () => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<{ ok: boolean; message: string }>;
 };
 const SyncContext = createContext<SyncContextValue | null>(null);
 async function responseError(response: Response) {
@@ -105,16 +105,17 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       setStatus((s) => ({
         ...s,
         path,
-        enabled: true,
+        enabled: connection.current.enabled,
         available: true,
         phase: 'synced',
-        message: '자동 반영 완료',
+        message: connection.current.enabled ? '자동 반영 완료' : '수동 반영 완료 · 자동 연결은 일시 중지 상태입니다.',
         lastSuccess,
       }));
   }
   async function poll(force = false) {
-    if (busy.current || pendingRef.current || !connection.current.enabled)
-      return;
+    if (busy.current || pendingRef.current) return { ok: false, message: '엑셀 확인 작업이 진행 중입니다. 잠시 후 다시 눌러 주세요.' };
+    if (!connection.current.path) return { ok: false, message: '엑셀 연동에서 파일 경로를 먼저 연결해 주세요.' };
+    if (!force && !connection.current.enabled) return { ok: false, message: '자동 연결이 일시 중지되어 있습니다.' };
     busy.current = true;
     const selectedPath = connection.current.path;
     try {
@@ -127,9 +128,9 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
         !force && hasRecords && saved.path === selectedPath
           ? saved.revision
           : '';
-      const response = await request('/__alkynes/source/file', {
-        headers: revision ? { 'If-None-Match': '"' + revision + '"' } : {},
-      });
+      const response = force && !connection.current.enabled
+        ? await request('/__alkynes/source/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: selectedPath }) })
+        : await request('/__alkynes/source/file', { headers: revision ? { 'If-None-Match': '"' + revision + '"' } : {} });
       if (response.status === 304) {
         if (mounted.current)
           setStatus((s) => ({
@@ -137,7 +138,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
             phase: 'synced',
             message: '파일 변경 없음',
           }));
-        return;
+        return { ok: true, message: '엑셀이 최신 상태입니다.' };
       }
       if (!response.ok) throw await responseError(response);
       const incomingRevision = response.headers.get('X-Alkynes-Revision');
@@ -152,9 +153,9 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       if (
         !mounted.current ||
         connection.current.path !== selectedPath ||
-        !connection.current.enabled
+        (!force && !connection.current.enabled)
       )
-        return;
+        return { ok: false, message: '연결 설정이 변경되어 반영을 중단했습니다.' };
       if (
         !storeRef.current.commit(
           '연결 Excel ' + plan.rows + '행 자동 반영',
@@ -165,8 +166,10 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
           '브라우저 저장에 실패했습니다. 마지막으로 저장된 데이터를 유지합니다. 저장 공간과 권한을 확인해 주세요.',
         );
       remember(selectedPath, incomingRevision);
+      return { ok: true, message: '엑셀 ' + plan.rows + '행 반영 완료' + (connection.current.enabled ? '' : ' · 자동 연결은 일시 중지 상태입니다.') };
     } catch (error) {
       failed(error);
+      return { ok: false, message: error instanceof Error ? error.message : '엑셀 반영에 실패했습니다.' };
     } finally {
       busy.current = false;
     }
@@ -519,4 +522,10 @@ export function ExcelSyncControls() {
       </p>
     </section>
   );
+}
+
+export function useExcelSync() {
+  const context = useContext(SyncContext);
+  if (!context) throw Error('ExcelSyncProvider is required');
+  return context;
 }
