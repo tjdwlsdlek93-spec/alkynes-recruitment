@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { candidateStatus, endedCandidate } from '@/lib/candidate-state';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
 import {
@@ -119,7 +120,8 @@ export default function Page() {
   }
   function classify(i: Interview) {
     if (i.status === '면접완료') return 'completed';
-    if (i.status === '취소') return 'cancelled';
+    const person = data.candidates.find(c => c.id === i.candidateId);
+    if (i.status === '취소' || (person && endedCandidate(person))) return 'cancelled';
     if (i.status === '확인 필요' || Date.parse(i.startsAt) < Date.now()) return 'review';
     return 'scheduled';
   }
@@ -179,10 +181,11 @@ export default function Page() {
                 <span className="text-sm text-slate-500">
                   {formatDate(i.startsAt)} (한국시간)
                 </span>
-                <span className={"badge " + (group === 'completed' ? 'bg-slate-100 text-slate-600' : group === 'review' ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-700')}>{classify(i) === 'review' ? '확인 필요' : i.status}</span>
+                <span className={"badge " + (group === 'completed' ? 'bg-slate-100 text-slate-600' : group === 'review' ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-700')}>{classify(i) === 'review' ? '확인 필요' : classify(i) === 'cancelled' && i.status !== '취소' ? '전형 종료' : i.status}</span>
               </div>
               {classify(i) === 'review' && i.status === '면접예정' && <p className="mt-2 text-xs text-amber-800">예정 시간이 지났습니다. 면접 실시 여부를 확인해 주세요.</p>}
-              {i.verification && (
+              {classify(i) === 'cancelled' && endedCandidate(c) && <p className="mt-2 text-xs text-slate-600">지원자 최종 상태: {candidateStatus(c)} · 미완료 일정은 취소 분류로 보관합니다.</p>}
+              {i.verification && classify(i) === 'review' && (
                 <p className="mt-2 text-xs text-amber-800">
                   확인 필요: {i.verification}
                 </p>
@@ -197,7 +200,7 @@ export default function Page() {
                 <button className="btn-secondary" onClick={() => setEditing(i)}>
                   일정 수정
                 </button>
-                {i.status !== '취소' && (
+                {classify(i) !== 'cancelled' && (
                   <>
                     <button className="btn-secondary" onClick={() => copy(i)}>
                       면접 안내문 복사

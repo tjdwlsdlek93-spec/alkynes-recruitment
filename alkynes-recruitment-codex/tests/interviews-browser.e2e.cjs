@@ -46,6 +46,23 @@ test('interviews separate scheduled, completed and unverified records and group 
     await page.getByText('확인 필요', { exact: true }).last().waitFor();
     assert.equal(await page.getByLabel('면접 채용공고 필터').inputValue(), 'job-b');
     assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 1);
+    await page.evaluate(() => {
+      const key = 'alkynes.recruitment.v1', data = JSON.parse(localStorage.getItem(key));
+      for (const id of ['person-e', 'person-c']) Object.assign(data.candidates.find(c => c.id === id), { status: '확인 필요', excelStage: '전형종료', excelFinal: '입사포기' });
+      localStorage.setItem(key, JSON.stringify(data));
+    });
+    await page.reload();
+    await page.getByText('지원자 최종 상태: 입사포기 · 미완료 일정은 취소 분류로 보관합니다.', { exact: true }).waitFor();
+    assert.equal(await tab('취소').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.getByRole('link', { name: '평가 작성 / 보기', exact: true }).count(), 0);
+    await tab('확인 필요').click();
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 0);
+    await page.goto(base + '/interviews?candidate=person-c');
+    await page.getByRole('button', { name: /^완료\s*\d+$/, pressed: true }).waitFor();
+    assert.equal(await tab('완료').getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.getByRole('link', { name: '평가 작성 / 보기', exact: true }).count(), 1);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('alkynes.recruitment.v1')));
+    assert.equal(saved.interviews.find(i => i.candidateId === 'person-e').status, '확인 필요');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 });
