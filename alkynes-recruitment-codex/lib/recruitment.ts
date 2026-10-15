@@ -101,6 +101,8 @@ export type ProcessRequest = Stamped & {
   completedAt: string;
   source?: string;
   sourceRow?: number;
+  examAt?: string;
+  examStatus?: '미실시' | '검사예정' | '실시완료';
   verification?: string;
   status: (typeof requestStatuses)[number];
   owner: string;
@@ -472,7 +474,9 @@ export function validateData(value: unknown): value is RecruitmentData {
       !d.requests.every(
         (q) =>
           stamp(q) &&
-          optionalStrings(q, ['source', 'verification']) &&
+          optionalStrings(q, ['source', 'verification', 'examAt']) &&
+          (!q.examAt || Number.isFinite(Date.parse(q.examAt))) &&
+          (q.examStatus === undefined || ['미실시', '검사예정', '실시완료'].includes(q.examStatus)) &&
           (q.sourceRow === undefined ||
             (Number.isInteger(q.sourceRow) && q.sourceRow > 0)) &&
           str(q, [

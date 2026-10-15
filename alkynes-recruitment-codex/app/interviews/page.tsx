@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { ShareMessage } from '@/components/ShareMessage';
+import { interviewMessage } from '@/lib/messages';
 import { candidateStatus, endedCandidate } from '@/lib/candidate-state';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
@@ -18,7 +20,8 @@ export default function Page() {
     [candidate, setCandidate] = useState(''),
     [job, setJob] = useState(''),
     [group, setGroup] = useState('scheduled'),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [sharing, setSharing] = useState<Interview | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('candidate') || '';
     setCandidate(id);
@@ -202,6 +205,7 @@ export default function Page() {
                 </button>
                 {classify(i) !== 'cancelled' && (
                   <>
+<button className="btn-secondary" onClick={() => setSharing(i)}>카톡 안내문</button>
                     <button className="btn-secondary" onClick={() => copy(i)}>
                       면접 안내문 복사
                     </button>
@@ -238,6 +242,7 @@ export default function Page() {
           </Empty>
         </div>
       )}
+      {sharing && <ShareMessage title="면접 일정 카톡 안내문" generate={audience => interviewMessage(data, sharing, audience)} onClose={() => setSharing(null)} />}
       {editing !== undefined && (
         <Modal
           title={editing ? '면접 일정 수정' : '면접 일정 등록'}

@@ -266,3 +266,31 @@ test('Excel final outcomes override verification stage and survive later request
   load('recruitment-view').removeLegacySamples(data);
   assert.equal(applicant[0].status, '불합격');
 });
+
+test('aptitude schedule imports from Excel, manual completion survives reimport, and private notes are excluded from share messages', async () => {
+  const { aptitudeMessage, interviewMessage } = load('messages');
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(await sample());
+  const sheet = book.getWorksheet('채용프로세스 적시성');
+  sheet.getRow(7).getCell(5).value = '인적성 검사 요청';
+  sheet.getRow(7).getCell(10).value = new Date('2026-10-16T10:00:00Z');
+  const plan = await parseExcel(await book.xlsx.writeBuffer(), 'test.xlsx');
+  const data = seedData(); applyExcelPlan(data, plan);
+  const request = data.requests.find(q => q.stage === '인적성 검사 요청');
+  assert.equal(request.examAt, '2026-10-16T01:00:00.000Z');
+  assert.equal(request.examStatus, '검사예정');
+  const exams = calendarEvents(data).filter(e => e.id.startsWith('aptitude-'));
+  assert.equal(exams.length, 1);
+  assert.equal(exams[0].date, '2026-10-16');
+  assert.equal(exams[0].time, '10:00');
+  request.examStatus = '실시완료'; request.notes = '공유하면 안 되는 내부 메모';
+  assert.ok(aptitudeMessage(data, request, 'candidate').includes('검사 완료 안내'));
+  assert.ok(!aptitudeMessage(data, request, 'internal').includes(request.notes));
+  const note = interviewMessage(data, data.interviews[0], 'candidate');
+  assert.ok(!note.includes('면접관:'));
+  assert.ok(note.includes('한국시간'));
+  applyExcelPlan(data, plan);
+  assert.equal(data.requests.find(q => q.id === request.id).examStatus, '실시완료');
+  assert.ok(validateData(data));
+  data.requests.find(q => q.id === request.id).examStatus = '잘못된상태';
+  assert.equal(validateData(data), false);
+});

@@ -293,6 +293,7 @@ export async function parseExcel(
       round: stageRound,
       receivedAt,
       dueAt: cachedDue || due(receivedAt, businessDays),
+      ...(stage === '인적성 검사 요청' ? { examAt } : {}),
       completedAt,
       status: completedAt ? '요청 완료' : '요청 전',
       owner: '',
@@ -402,7 +403,10 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
   });
   upsert(data.candidates, people, true);
   data.requests ||= [];
-  upsert(data.requests, plan.requests);
+  upsert(data.requests, plan.requests.map(q => {
+    const old = data.requests!.find(row => row.id === q.id);
+    return q.stage === '인적성 검사 요청' ? { ...q, examStatus: old?.examStatus || (q.examAt ? '검사예정' as const : '미실시' as const) } : q;
+  }));
   upsert(
     data.interviews,
     plan.interviews.map((i) => {

@@ -57,7 +57,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
   });
   for (const c of data.candidates.filter(c=>!c.excelMissing)) {
     for (const [kind, dates] of [
-      ['인적성 검사', c.examDates || []],
+      ['인적성 검사', (data.requests || []).some(q => q.candidateId === c.id && q.stage === '인적성 검사 요청' && q.examAt) ? [] : c.examDates || []],
       ['입사예정', c.expectedJoin ? [c.expectedJoin] : []],
       ['실제 입사', c.actualJoin ? [c.actualJoin] : []],
     ] as const) {
@@ -74,6 +74,11 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
     }
   }
   for (const q of data.requests || []) {
+    if (q.stage === '인적성 검사 요청' && q.examAt && q.status !== '취소') events.push({
+      id: 'aptitude-' + q.id, date: koreaDate(q.examAt), time: time(q.examAt),
+      title: labels(q.requisitionId, q.candidateId) + ' 인적성 검사 · ' + q.round + '회차',
+      status: q.examStatus || '검사예정', timing: '', href: '/aptitudes',
+    });
     if (q.receivedAt)
       events.push({
         id: 'request-' + q.id,

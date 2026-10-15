@@ -12,6 +12,7 @@ import { Modal } from './Forms';
 import { parseExcel, applyExcelSnapshot, type ExcelPlan } from '@/lib/excel';
 import { download, formatDate } from '@/lib/recruitment';
 const META = 'alkynes.excelSync.v1';
+const IMPORT_SCHEMA = 2;
 const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {
@@ -43,6 +44,7 @@ function meta() {
       path?: string;
       revision?: string;
       lastSuccess?: string;
+      schemaVersion?: number;
     };
   } catch {
     return {};
@@ -98,7 +100,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         META,
-        JSON.stringify({ path, revision, lastSuccess }),
+        JSON.stringify({ path, revision, lastSuccess, schemaVersion: IMPORT_SCHEMA }),
       );
     } catch {}
     if (mounted.current)
@@ -125,7 +127,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
         (q) => q.source === 'kpi-excel',
       );
       const revision =
-        !force && hasRecords && saved.path === selectedPath
+        !force && hasRecords && saved.path === selectedPath && saved.schemaVersion === IMPORT_SCHEMA
           ? saved.revision
           : '';
       const response = force && !connection.current.enabled
