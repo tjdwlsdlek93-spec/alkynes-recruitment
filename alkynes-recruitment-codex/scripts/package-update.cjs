@@ -19,5 +19,5 @@ walk(root);
 const content = zlib.gzipSync(Buffer.from(JSON.stringify({ ...info, files })), { level: 9 });
 fs.mkdirSync(out, { recursive: true });
 fs.writeFileSync(path.join(out, 'alkynes-update.json.gz'), content);
-fs.writeFileSync(path.join(out, 'alkynes-update.json'), JSON.stringify({ ...info, sha256: crypto.createHash('sha256').update(content).digest('hex'), notes: '앱 업데이트 기능 추가 · 엑셀 자동 연결 유지 및 재시도 개선' }, null, 2));
+fs.writeFileSync(path.join(out, 'alkynes-update.json'), JSON.stringify({ ...info, sha256: crypto.createHash('sha256').update(content).digest('hex'), notes: info.notes || '채용관리 앱 기능 및 화면 개선' }, null, 2));
 console.log('Update bundle generated:', info.version, files.length, 'files');

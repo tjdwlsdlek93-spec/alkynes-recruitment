@@ -1,0 +1,51 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { chromium } = require('playwright');
+test('interviews separate scheduled, completed and unverified records and group by recruitment', async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  try {
+    await page.clock.install({ time: new Date('2026-10-15T09:00:00+09:00') });
+    const base = process.env.E2E_BASE_URL || 'http://127.0.0.1:8793';
+    await page.goto(base + '/interviews');
+    await page.getByRole('heading', { name: '면접 일정', exact: true }).waitFor();
+    await page.evaluate(() => {
+      const stamp = { createdAt: '2026-10-14T00:00:00.000Z', updatedAt: '2026-10-14T00:00:00.000Z' };
+      const requisitions = ['a', 'b'].map((key, i) => ({ ...stamp, id: 'job-' + key, code: 'HR-2026-00' + (i + 1), department: '테스트부서' + key, requester: '', role: '테스트공고' + key, headcount: 1, reason: '', duties: '', requirements: '', preferred: '', targetJoin: '', status: '진행중' }));
+      const candidates = ['a', 'b', 'c', 'd', 'e', 'f'].map((key, i) => ({ ...stamp, id: 'person-' + key, requisitionId: ['a', 'b', 'a', 'a', 'b', 'b'][i] === 'a' ? 'job-a' : 'job-b', name: '검증지원자' + key, source: '', career: '', phone: '', email: '', status: '면접예정', notes: '', resumeName: '', resumeData: '' }));
+      const interviews = candidates.map((c, i) => ({ ...stamp, id: 'meeting-' + i, candidateId: c.id, startsAt: ['2026-10-16T05:00:00.000Z', '2026-10-17T05:00:00.000Z', '2026-10-14T05:00:00.000Z', '2026-10-13T05:00:00.000Z', '2026-10-18T05:00:00.000Z', '2026-10-19T05:00:00.000Z'][i], location: '테스트회의실', interviewers: ['테스트면접관'], status: ['면접예정', '면접예정', '면접완료', '면접예정', '확인 필요', '취소'][i] }));
+      localStorage.setItem('alkynes.recruitment.v1', JSON.stringify({ version: 1, requisitions, candidates, interviews, evaluations: [], activity: [], requests: [] }));
+    });
+    await page.reload();
+    const tab = name => page.getByRole('button', { name: new RegExp('^' + name + '\\s*\\d+$') });
+    await page.getByRole('heading', { name: '테스트공고a', exact: true }).waitFor();
+    assert.equal(await page.getByRole('heading', { name: '테스트공고b', exact: true }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 2);
+    await tab('완료').click();
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 1);
+    assert.ok((await page.locator('main').innerText()).includes('검증지원자c'));
+    assert.equal(await page.getByRole('heading', { name: '테스트공고b', exact: true }).count(), 0);
+    await tab('확인 필요').click();
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 2);
+    await page.getByText('예정 시간이 지났습니다. 면접 실시 여부를 확인해 주세요.', { exact: true }).waitFor();
+    await page.getByLabel('면접 채용공고 필터').selectOption('job-a');
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 1);
+    assert.equal(await page.getByLabel('면접 지원자 필터').locator('option').count(), 4);
+    await tab('취소').click();
+    await page.getByText('선택한 분류와 채용공고에 해당하는 면접이 없습니다.', { exact: true }).waitFor();
+    await tab('예정').click();
+    await page.getByRole('button', { name: '일정 수정', exact: true }).click();
+    await page.locator('select[name=status]').selectOption('면접완료');
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 0);
+    await page.reload(); await tab('완료').click();
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 2);
+    await page.screenshot({ path: '/workspace/scratch/interviews-grouped.png', fullPage: true });
+    await page.goto(base + '/interviews?candidate=person-e');
+    await page.getByText('확인 필요', { exact: true }).last().waitFor();
+    assert.equal(await page.getByLabel('면접 채용공고 필터').inputValue(), 'job-b');
+    assert.equal(await page.getByRole('button', { name: '일정 수정', exact: true }).count(), 1);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});
