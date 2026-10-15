@@ -150,7 +150,7 @@ export default function Page() {
         </button>
       </div>
       <div className="segmented w-fit max-w-full flex-wrap" role="group" aria-label="면접 일정 분류">
-        {([['scheduled', '예정'], ['completed', '완료'], ['review', '확인 필요'], ['cancelled', '취소']] as const).map(([key, label]) => <button key={key} aria-pressed={group === key} className={group === key ? 'selected' : ''} onClick={() => setGroup(key)}>{label}<span>{scope.filter(i => classify(i) === key).length}</span></button>)}
+        {([['scheduled', '예정'], ['review', '확인 필요'], ['completed', '완료'], ['cancelled', '취소']] as const).map(([key, label]) => <button key={key} aria-pressed={group === key} className={group === key ? 'selected' : ''} onClick={() => setGroup(key)}>{label}<span>{scope.filter(i => classify(i) === key).length}</span></button>)}
       </div>
       <div className="flex flex-wrap gap-3">
         <select aria-label="면접 채용공고 필터" className="field max-w-sm" value={job} onChange={e => { setJob(e.target.value); setCandidate(''); }}>
