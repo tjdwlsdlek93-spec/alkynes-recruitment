@@ -33,13 +33,10 @@ export default function Dashboard() {
   const hired = data.candidates.filter(c => !c.excelMissing && c.expectedJoin && koreaDate(c.expectedJoin).startsWith(month) && ['입사확정', '실제 입사', '최종합격'].includes(c.status)).length;
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-teal-100 bg-gradient-to-r from-teal-50 via-white to-sky-50 p-7 sm:p-9">
-        <div className="mb-3 text-xs font-bold tracking-[0.2em] text-teal-700">YOUR TEAM, YOUR NEXT CHAPTER</div>
-        <h1 className="text-3xl font-bold tracking-tight">채용 현황</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          전형 요청자는 진행중 채용의 인적성·면접 요청자를 중복 없이 집계합니다. 입사예정은 확정자의 입사예정일, 실제 입사는 실제 입사일을 기준으로 이번 달만 집계합니다.
-        </p>
-      </div>
+      <header className="dashboard-hero">
+        <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro">새로운 동료를 만나는 과정, 한눈에 살펴보세요.<br/>진행중인 채용부터 오늘의 일정까지 이 보드에서 확인합니다.</p></div>
+        <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>우리 팀의 채용 워크스페이스</small></div>
+      </header>
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         {[
           ['진행중 채용', active.length],
@@ -52,17 +49,33 @@ export default function Dashboard() {
               (c) =>  !c.excelMissing && c.actualJoin && koreaDate(c.actualJoin).startsWith(month) && koreaDate(c.actualJoin) <= today,
             ).length,
           ],
-        ].map(([k, v]) => (
-          <div className="card p-5" key={String(k)}>
-            <div className="text-sm text-slate-500">{k}</div>
-            <div className="mt-2 text-3xl font-bold">{v}</div>
+        ].map(([k, v], index) => (
+          <div className="card metric-note" key={String(k)}>
+            <div className="metric-label">{k}</div>
+            <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 입사예정일 기준', '이번 달 실제 입사일 기준'][index]}</p>
           </div>
         ))}
       </div>
-      <RecruitmentCalendar />
+      <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside">
+      <div className="card week-note p-5">
+        <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접 · 한국시간 기준</h2>
+        {thisWeek.map((i) => (
+          <Link
+            className="block rounded-xl border p-3 mb-2 text-sm"
+            key={i.id}
+            href={'/evaluations?interview=' + i.id}
+          >
+            {data.candidates.find((c) => c.id === i.candidateId)?.name} ·{' '}
+            {formatDate(i.startsAt)} · {i.location}
+          </Link>
+        ))}
+        {!thisWeek.length && <Empty>이번주 예정된 면접이 없습니다.</Empty>}
+      </div>
+        <div className="card desk-note p-5"><span className="board-eyebrow">BOARD MEMO</span><h2 className="mt-3 font-bold">이렇게 확인하세요</h2><ul className="mt-4 space-y-3 text-xs leading-6 text-slate-600"><li>· 엑셀 저장 후 좌측의 <strong>엑셀 업데이트</strong>를 누르면 바로 반영됩니다.</li><li>· 입사포기·지원포기 등 종료된 전형은 진행중 집계에서 제외합니다.</li><li>· 인적성·면접 화면에서 카톡 안내문을 작성하고 복사할 수 있습니다.</li></ul></div>
+      </aside></div>
       <div className="card overflow-x-auto">
         <div className="border-b p-5">
-          <h2 className="font-bold">진행중 채용</h2>
+          <span className="section-label">HIRING NOW</span><h2 className="font-bold">진행중 채용</h2>
         </div>
         <table className="w-full whitespace-nowrap text-sm">
           <thead className="bg-slate-50 text-slate-500">
@@ -155,20 +168,6 @@ export default function Dashboard() {
           </tbody>
         </table>
         {!active.length && <Empty>진행중인 채용 요청이 없습니다.</Empty>}
-      </div>
-      <div className="card p-5">
-        <h2 className="mb-3 font-bold">이번주 면접 · 한국시간 기준</h2>
-        {thisWeek.map((i) => (
-          <Link
-            className="block rounded-xl border p-3 mb-2 text-sm"
-            key={i.id}
-            href={'/evaluations?interview=' + i.id}
-          >
-            {data.candidates.find((c) => c.id === i.candidateId)?.name} ·{' '}
-            {formatDate(i.startsAt)} · {i.location}
-          </Link>
-        ))}
-        {!thisWeek.length && <Empty>이번주 예정된 면접이 없습니다.</Empty>}
       </div>
       <div className="card p-5">
         <h2 className="mb-3 font-bold">최근 변경 이력</h2>

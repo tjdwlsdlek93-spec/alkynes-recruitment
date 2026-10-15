@@ -24,10 +24,10 @@ export function RecruitmentCalendar() {
     setSelected(next + '-01');
   }
   return (
-    <section className="card p-4 sm:p-5" aria-label="채용 일정 캘린더">
+    <section className="card calendar-panel p-4 sm:p-5" aria-label="채용 일정 캘린더">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-bold">채용 캘린더</h2>
+          <span className="section-label">SCHEDULE</span><h2 className="font-bold">채용 캘린더</h2>
           <p className="mt-1 text-xs text-slate-500">
             면접 · 요청 접수 · 미완료 요청 마감 / 한국시간
           </p>
