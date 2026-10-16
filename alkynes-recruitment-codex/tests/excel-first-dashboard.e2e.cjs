@@ -27,7 +27,7 @@ test('Excel-first UI removes create buttons, provides zero-record message previe
     });
     await page.goto(base + '/dashboard');
     await page.getByRole('heading', { name: '채용 현황', exact: true }).waitFor();
-    const week = page.locator('.card').filter({ has: page.getByRole('heading', { name: '이번주 면접', exact: true }) });
+    const week = page.locator('.week-note');
     assert.ok((await week.innerText()).includes('검증지원자C'));
     assert.ok(!(await week.innerText()).includes('검증지원자A'));
     assert.ok(!(await week.innerText()).includes('검증지원자B'));

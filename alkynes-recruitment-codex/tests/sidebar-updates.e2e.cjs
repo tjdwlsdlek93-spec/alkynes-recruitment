@@ -37,7 +37,7 @@ test('sidebar buttons update Excel and install app without leaving current page;
     assert.ok((await actions.locator('.sync-timestamp').innerText()).includes('마지막 반영'));
     assert.ok(!(await actions.locator('.sync-timestamp').innerText()).includes('아직 없음'));
     assert.equal(await page.getByText('앱 업데이트 시 완료 후 화면이 다시 열립니다.', { exact: true }).count(), 0);
-    assert.equal(await page.getByText('by MIN SEONG JIN', { exact: true }).count(), 1);
+    assert.equal(await page.getByText('by SEONGJIN MIN', { exact: true }).count(), 1);
     assert.equal(await page.getByLabel('전구', { exact: true }).count(), 1);
     assert.equal(reads, 1); assert.equal(page.url(), base + '/interviews');
     assert.equal((await page.evaluate(() => JSON.parse(localStorage.getItem('alkynes.recruitment.v1')))).candidates.length, 1);

@@ -166,9 +166,9 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
 
 /* Shape the paper itself, then cast its shadow from a transparent wrapper. */
 .metric-paper { min-width:0; display:flex; filter:drop-shadow(3px 4px 0 #35322c) drop-shadow(0 7px 6px #29272216); transition:transform .2s ease,filter .2s ease; }
-.metric-paper .metric-note { flex:1; min-width:0; background-color:var(--note-color); box-shadow:none; clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%); }
-.metric-fold { position:absolute; top:0; right:0; width:24px; height:24px; color:#ffffffb0; filter:drop-shadow(-2px 3px 2px #29272220); pointer-events:none; }
-.brand-credit { margin-top:5px; font-size:10px; line-height:1.5; letter-spacing:.09em; color:#827a68; white-space:nowrap; }
+.metric-paper .metric-note { flex:1; min-width:0; background-color:var(--note-color); box-shadow:none; clip-path:polygon(0 0,calc(100% - 30px) 0,100% 30px,100% 100%,0 100%); }
+.metric-fold { position:absolute; top:0; right:0; width:30px; height:30px; overflow:visible; pointer-events:none; }
+.brand-credit { font-style:italic; margin-top:5px; font-size:10px; line-height:1.5; letter-spacing:.09em; color:#827a68; white-space:nowrap; }
 .brand-credit span { font-size:11px; font-style:italic; letter-spacing:0; margin-right:3px; }
 body { word-break:keep-all; overflow-wrap:break-word; }
 p,li { text-wrap:pretty; }
@@ -201,3 +201,9 @@ dialog[open] { animation:dialog-appear .2s ease-out backwards; }
 @media(prefers-reduced-motion:reduce) {
   .dashboard-hero,.recruitment-hero,.card,.metric-paper,.board-date,.sidebar-footer,.week-note a,.calendar-panel [aria-label='선택한 날짜 일정'] > a,dialog[open] { animation:none !important; transition:none !important; transform:none !important; }
 }
+
+/* Clearer title hierarchy; calendar dates and event labels keep their sizes. */
+.brand-title { font-size:24px; line-height:1.35; font-weight:800; letter-spacing:-.035em; }
+.metric-note .metric-label { font-size:16px; font-weight:800; color:var(--ink); letter-spacing:-.025em; }
+main .card h2:not(.metric-label),.calendar-panel h2 { font-size:18px; line-height:1.5; font-weight:800; }
+.dashboard-hero .intro strong { font-weight:800; color:#443c24; }

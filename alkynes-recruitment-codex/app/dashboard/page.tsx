@@ -34,7 +34,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <header className="dashboard-hero">
-        <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro">채용은 척척, 일정은 착착!<br/>오늘도 내 채용 보드는 열일 중입니다.</p></div>
+        <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro"><strong>오늘의 채용, 어디까지 왔을까요?</strong><br/>진행 중인 일정과 지원자를 확인해보세요.</p></div>
         <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>나만의 채용 아지트</small></div>
       </header>
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
@@ -51,9 +51,19 @@ export default function Dashboard() {
           ],
         ].map(([k, v], index) => (
           <div className="metric-paper" key={String(k)}><div className="card metric-note">
-            <div className="metric-label">{k}</div>
+            <h2 className="metric-label">{k}</h2>
             <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 입사예정일 기준', '이번 달 실제 입사일 기준'][index]}</p>
-            <svg className="metric-fold" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 0L24 24H0Z" fill="currentColor"/><path d="M0 .5L23.5 24M.5 .5V23.5H23.5" fill="none" stroke="#635c4845" strokeWidth="1"/></svg>
+            <svg className="metric-fold" viewBox="0 0 30 30" aria-hidden="true">
+              <defs>
+                <linearGradient id={`fold-face-${index}`} x1="0" y1="0" x2="0.3" y2="1">
+                  <stop offset="0" stopColor="#fffef9"/><stop offset=".48" stopColor="var(--note-color)"/><stop offset=".78" stopColor="#fffef9"/><stop offset="1" stopColor="#cec5af"/>
+                </linearGradient>
+                <filter id={`fold-shadow-${index}`} x="-60%" y="-40%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.8"/></filter>
+              </defs>
+              <path d="M1 1L29 29C20 27 11 26 3 28Q-1 28 1 23C3 15 2 7 1 1Z" fill="#554c38" opacity=".26" transform="translate(-1 2)" filter={`url(#fold-shadow-${index})`}/>
+              <path d="M.7 .7L29.3 29.3C21 27.9 12 26.6 4 27.6Q.4 28.1 1.1 24.5C2.8 16.8 2.8 8.4 .7 .7Z" fill={`url(#fold-face-${index})`} stroke="#8b80652e" strokeWidth=".65"/>
+              <path d="M1.1 1.1L28.9 28.9" stroke="#fffef6" strokeOpacity=".85" strokeWidth=".8"/>
+            </svg>
           </div></div>
         ))}
       </div>
