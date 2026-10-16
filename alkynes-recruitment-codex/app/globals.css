@@ -55,12 +55,11 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
 .board-date strong { display:block; margin-top:8px; font-size:22px; letter-spacing:-.04em; }
 .board-date small { display:block; margin-top:5px; color:#6b6144; font-size:11px; }
 .metric-note { position:relative; display:flex; flex-direction:column; min-height:153px; overflow:hidden; padding:18px 19px; border-radius:7px; box-shadow:3px 3px 0 var(--line); }
-.metric-note::after { content:''; position:absolute; top:0; right:0; width:21px; height:21px; background:#ffffff55; border-bottom:1px solid #29272214; border-left:1px solid #29272214; }
-.metric-note:nth-child(1) { background:#fff0a8; }
-.metric-note:nth-child(2) { background:var(--blue); }
-.metric-note:nth-child(3) { background:var(--lilac); }
-.metric-note:nth-child(4) { background:var(--mint); }
-.metric-note:nth-child(5) { background:var(--peach); }
+.metric-paper:nth-child(1) { --note-color:#fff0a8; }
+.metric-paper:nth-child(2) { --note-color:var(--blue); }
+.metric-paper:nth-child(3) { --note-color:var(--lilac); }
+.metric-paper:nth-child(4) { --note-color:var(--mint); }
+.metric-paper:nth-child(5) { --note-color:var(--peach); }
 .metric-note .metric-label { max-width:calc(100% - 15px); font-size:12px; font-weight:700; color:#555044; line-height:1.5; }
 .metric-note .metric-value { margin-top:auto; padding-top:13px; font-size:40px; font-weight:800; line-height:1.1; letter-spacing:-.06em; color:var(--ink); }
 .metric-note .metric-caption { margin-top:7px; font-size:10px; line-height:1.5; color:#746c5c; }
@@ -89,7 +88,7 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
 @media(min-width:1440px) { .dashboard-board { display:grid; grid-template-columns:minmax(0,1fr) 280px; align-items:start; gap:22px; } }
 @media(max-width:1439px) { .dashboard-aside { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:22px; } }
 @media(max-width:1100px) { .hero-art { right:-15px; opacity:.5; } .recruitment-hero .max-w-xl { max-width:70%; } }
-@media(max-width:640px) { .dashboard-hero { padding:23px; } .dashboard-hero h1 { font-size:33px; } .board-date { display:none; } .metric-note { min-height:142px; padding:15px; } .metric-note:last-child { grid-column:span 2; } .dashboard-aside { grid-template-columns:1fr; } .recruitment-hero { padding:25px; min-height:auto; } .recruitment-hero .max-w-xl { max-width:100%; } .hero-art { display:none; } .segmented { width:100%; } .segmented button { flex:1; padding:9px 10px; } }
+@media(max-width:640px) { .dashboard-hero { padding:23px; } .dashboard-hero h1 { font-size:33px; } .board-date { display:none; } .metric-note { min-height:142px; padding:15px; } .metric-paper:last-child { grid-column:span 2; } .dashboard-aside { grid-template-columns:1fr; } .recruitment-hero { padding:25px; min-height:auto; } .recruitment-hero .max-w-xl { max-width:100%; } .hero-art { display:none; } .segmented { width:100%; } .segmented button { flex:1; padding:9px 10px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none !important; animation:none !important; } }
 @media(max-width:767px) {
   .sidebar { padding:16px !important; border-right:0; border-bottom:1.5px solid var(--line); }
@@ -148,7 +147,6 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
 .card,.job-card { box-shadow:3px 4px 0 #35322c,0 8px 17px -13px #29272270; }
 .dashboard-hero,.recruitment-hero { box-shadow:4px 5px 0 var(--line),0 12px 20px -15px #29272270; }
 .metric-note { background-image:linear-gradient(135deg,#ffffff30 0%,transparent 55%,#29272208 100%); box-shadow:3px 4px 0 var(--line),0 12px 18px -13px #29272280; }
-.metric-note::after { width:23px; height:23px; background:linear-gradient(45deg,#29272218 0%,#ffffffb0 49%,#ffffff45 51%); box-shadow:-2px 2px 3px #2927220a; }
 .board-date { box-shadow:3px 4px 0 var(--line),0 10px 16px -11px #29272280; }
 .desk-note { background-image:linear-gradient(145deg,#ffffff38,transparent 70%,#29272206); }
 .desk-note::before { box-shadow:0 2px 3px #29272212; }
@@ -159,9 +157,47 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
   .nav-item:hover { transform:translateY(-2px); box-shadow:2px 3px 0 #35322c45; }
   .nav-item.active:hover { box-shadow:3px 5px 0 var(--line); }
   .segmented button:not(:disabled):hover { transform:translateY(-2px); box-shadow:1px 3px 0 #35322c55; background:var(--paper); }
-  .metric-note:hover,.job-card:hover { transform:translateY(-3px); box-shadow:4px 7px 0 var(--line),0 14px 20px -14px #29272290; }
+  .job-card:hover { transform:translateY(-3px); box-shadow:4px 7px 0 var(--line),0 14px 20px -14px #29272290; }
 }
 .btn:not(:disabled):active,.btn-primary:not(:disabled):active,.btn-secondary:not(:disabled):active,.nav-item:active,.segmented button:not(:disabled):active { transform:translateY(1px); box-shadow:1px 1px 0 var(--line); }
 @media(prefers-reduced-motion:reduce) {
-  .btn,.btn-primary,.btn-secondary,.nav-item,.segmented button,.metric-note,.job-card { transform:none !important; transition:none !important; }
+  .btn,.btn-primary,.btn-secondary,.nav-item,.segmented button,.metric-paper,.metric-note,.job-card { transform:none !important; transition:none !important; }
+}
+
+/* Shape the paper itself, then cast its shadow from a transparent wrapper. */
+.metric-paper { min-width:0; display:flex; filter:drop-shadow(3px 4px 0 #35322c) drop-shadow(0 7px 6px #29272216); transition:transform .2s ease,filter .2s ease; }
+.metric-paper .metric-note { flex:1; min-width:0; background-color:var(--note-color); box-shadow:none; clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%); }
+.metric-fold { position:absolute; top:0; right:0; width:24px; height:24px; color:#ffffffb0; filter:drop-shadow(-2px 3px 2px #29272220); pointer-events:none; }
+.brand-credit { margin-top:5px; font-size:10px; line-height:1.5; letter-spacing:.09em; color:#827a68; white-space:nowrap; }
+.brand-credit span { font-size:11px; font-style:italic; letter-spacing:0; margin-right:3px; }
+body { word-break:keep-all; overflow-wrap:break-word; }
+p,li { text-wrap:pretty; }
+.empty-state { word-break:keep-all; text-wrap:balance; }
+.desk-note::before { width:80px; height:23px; top:-11px; left:calc(50% - 40px); border:0; border-radius:0; transform:rotate(-4deg); opacity:.9;
+  background:linear-gradient(118deg,transparent 31%,#fff9db70 33%,transparent 35%,transparent 66%,#a78c3020 68%,transparent 70%),repeating-linear-gradient(90deg,#fffdf419 0 1px,transparent 1px 4px),linear-gradient(180deg,#c4ac5830 0 1px,#e3d5a58c 1px 21px,#b7a05f50 21px 23px);
+  clip-path:polygon(1% 0,100% 0,98% 13%,100% 25%,98% 38%,100% 50%,98% 63%,100% 75%,98% 88%,100% 100%,0 100%,2% 88%,0 75%,2% 63%,0 50%,2% 38%,0 25%,2% 13%);
+  box-shadow:inset 0 1px 0 #fff9e580,inset 0 -1px 0 #a9965550; }
+@media(hover:hover) and (pointer:fine) { .metric-paper:hover { transform:translateY(-3px); filter:drop-shadow(4px 7px 0 #35322c) drop-shadow(0 9px 7px #29272224); } }
+
+/* Shared motion across pages: entrance, paper elevation and interaction feedback. */
+@keyframes board-appear { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes dialog-appear { from { opacity:0; transform:translateY(10px) scale(.985); } to { opacity:1; transform:translateY(0) scale(1); } }
+.dashboard-hero,.recruitment-hero,.card:not(.metric-note),.metric-paper { animation:board-appear .32s ease-out backwards; }
+.dashboard-hero,.recruitment-hero,.card:not(.metric-note),.board-date,.sidebar-footer { transition:transform .2s ease,box-shadow .2s ease,background-color .2s ease; }
+.field { transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease; }
+.field:focus { border-color:#a88d25; box-shadow:0 0 0 3px #d2b95024; }
+.badge,a { transition:background-color .18s ease,color .18s ease,border-color .18s ease; }
+tbody tr { transition:background-color .18s ease; }
+.calendar-panel [aria-label^='202'] { transition:background-color .18s ease,box-shadow .18s ease; }
+.week-note a,.calendar-panel [aria-label='선택한 날짜 일정'] > a { transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease; }
+dialog[open] { animation:dialog-appear .2s ease-out backwards; }
+@media(hover:hover) and (pointer:fine) {
+  .dashboard-hero:hover,.recruitment-hero:hover,.card:not(.metric-note):hover { transform:translateY(-3px); box-shadow:4px 7px 0 var(--line),0 14px 20px -14px #29272270; }
+  .board-date:hover { transform:translateY(-2px) rotate(1deg); box-shadow:4px 6px 0 var(--line),0 12px 18px -12px #29272270; }
+  .sidebar-footer:hover { transform:translateY(-2px); box-shadow:0 5px 12px -8px #29272260; }
+  .week-note a:hover,.calendar-panel [aria-label='선택한 날짜 일정'] > a:hover { transform:translateY(-2px); box-shadow:0 4px 8px -5px #29272270; }
+  .field:not(:disabled):hover { border-color:#9e9278; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .dashboard-hero,.recruitment-hero,.card,.metric-paper,.board-date,.sidebar-footer,.week-note a,.calendar-panel [aria-label='선택한 날짜 일정'] > a,dialog[open] { animation:none !important; transition:none !important; transform:none !important; }
 }

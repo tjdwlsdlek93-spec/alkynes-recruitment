@@ -34,8 +34,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <header className="dashboard-hero">
-        <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro">새로운 동료를 만나는 과정, 한눈에 살펴보세요.<br/>진행중인 채용부터 오늘의 일정까지 이 보드에서 확인합니다.</p></div>
-        <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>우리 팀의 채용 워크스페이스</small></div>
+        <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro">채용은 척척, 일정은 착착!<br/>오늘도 내 채용 보드는 열일 중입니다.</p></div>
+        <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>나만의 채용 아지트</small></div>
       </header>
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         {[
@@ -50,10 +50,11 @@ export default function Dashboard() {
             ).length,
           ],
         ].map(([k, v], index) => (
-          <div className="card metric-note" key={String(k)}>
+          <div className="metric-paper" key={String(k)}><div className="card metric-note">
             <div className="metric-label">{k}</div>
             <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 입사예정일 기준', '이번 달 실제 입사일 기준'][index]}</p>
-          </div>
+            <svg className="metric-fold" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 0L24 24H0Z" fill="currentColor"/><path d="M0 .5L23.5 24M.5 .5V23.5H23.5" fill="none" stroke="#635c4845" strokeWidth="1"/></svg>
+          </div></div>
         ))}
       </div>
       <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside">
@@ -69,7 +70,7 @@ export default function Dashboard() {
             {formatDate(i.startsAt)} · {i.location}
           </Link>
         ))}
-        {!thisWeek.length && <Empty>이번주 예정된 면접이 없습니다.</Empty>}
+        {!thisWeek.length && <Empty>이번 주 예정된 면접이 없습니다.</Empty>}
       </div>
         <div className="card desk-note p-5"><span className="board-eyebrow">BOARD MEMO</span><h2 className="mt-3 font-bold">이렇게 확인하세요</h2><ul className="mt-4 space-y-3 text-xs leading-6 text-slate-600"><li>· 엑셀 저장 후 좌측의 <strong>엑셀 업데이트</strong>를 누르면 바로 반영됩니다.</li><li>· 입사포기·지원포기 등 종료된 전형은 진행중 집계에서 제외합니다.</li><li>· 인적성·면접 화면에서 카톡 안내문을 작성하고 복사할 수 있습니다.</li></ul></div>
       </aside></div>

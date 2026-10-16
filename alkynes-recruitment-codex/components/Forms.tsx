@@ -97,7 +97,7 @@ export function Actions({
   );
 }
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="p-6 text-center text-sm text-slate-500">{children}</p>;
+  return <p className="empty-state p-6 text-center text-sm text-slate-500">{children}</p>;
 }
 export function value(form: FormData, key: string) {
   return String(form.get(key) || '').trim();
