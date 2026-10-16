@@ -4,3 +4,8 @@ next-env.d.ts
 *.tsbuildinfo
 .env*.local
 .vercel/
+
+/public/_server/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

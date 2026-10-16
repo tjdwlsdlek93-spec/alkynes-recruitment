@@ -159,13 +159,13 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       )
         return { ok: false, message: '연결 설정이 변경되어 반영을 중단했습니다.' };
       if (
-        !storeRef.current.commit(
+        !await storeRef.current.commit(
           '연결 Excel ' + plan.rows + '행 자동 반영',
           (d) => applyExcelSnapshot(d, plan),
         )
       )
         throw Error(
-          '브라우저 저장에 실패했습니다. 마지막으로 저장된 데이터를 유지합니다. 저장 공간과 권한을 확인해 주세요.',
+          '노트북 저장에 실패했습니다. 마지막으로 저장된 데이터를 유지합니다. DB 파일과 디스크 공간을 확인해 주세요.',
         );
       remember(selectedPath, incomingRevision);
       return { ok: true, message: '엑셀 ' + plan.rows + '행 반영 완료' + (connection.current.enabled ? '' : ' · 자동 연결은 일시 중지 상태입니다.') };
@@ -288,7 +288,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       connection.current = { path: config.path, enabled: true };
       setStatus(s => ({ ...s, path: config.path, enabled: true }));
       if (
-        !storeRef.current.commit(
+        !await storeRef.current.commit(
           '네이버웍스 동기화 파일 자동 연결 및 ' +
             pending.plan.rows +
             '행 반영',

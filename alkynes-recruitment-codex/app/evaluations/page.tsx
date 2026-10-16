@@ -29,7 +29,7 @@ export default function Page() {
   const existing = data.evaluations.find(
     (e) => e.interviewId === interviewId && e.evaluator === evaluator,
   );
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!interview || !evaluator) return;
     const f = new FormData(event.currentTarget);
@@ -42,7 +42,7 @@ export default function Page() {
       overall: value(f, 'overall') as Evaluation['overall'],
       comment: value(f, 'comment'),
     };
-    commit(
+    await commit(
       '면접 평가 ' +
         person?.name +
         ' / ' +

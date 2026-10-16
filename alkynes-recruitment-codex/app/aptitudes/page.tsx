@@ -16,7 +16,7 @@ export default function Page() {
   const ended = (q: ProcessRequest) => q.status === '취소' || q.examStatus === '실시완료' || data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) || data.requisitions.some(r => r.id === q.requisitionId && (closedJob(r) || r.excelMissing));
   const shareable = all.filter(q => q.status !== '취소' && !data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)));
   const rows = all.filter(q => (!job || q.requisitionId === job) && (group === 'all' || ended(q) === (group === 'ended'))).sort((a,b) => b.receivedAt.localeCompare(a.receivedAt));
-  function save(e: FormEvent<HTMLFormElement>) {
+  async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setError('');
     const f = new FormData(e.currentTarget), person = data.candidates.find(c => c.id === value(f, 'candidateId'));
     if (!person) { setError('지원자를 선택해 주세요.'); return; }
@@ -26,7 +26,7 @@ export default function Page() {
     if (status === '요청 완료' && !fields.completedAt) { setError('요청 처리 완료일시를 입력해 주세요. 검사 실시일과는 별개입니다.'); return; }
     if ((fields.dueAt && fields.dueAt < fields.receivedAt) || (fields.completedAt && fields.completedAt < fields.receivedAt)) { setError('기한과 처리 완료일시는 요청일 이후여야 합니다.'); return; }
     if (fields.examStatus === '실시완료' && !fields.examAt) { setError('검사 실시일시를 입력해 주세요.'); return; }
-    if (commit('인적성 검사 요청 저장: ' + person.name, d => {
+    if (await commit('인적성 검사 요청 저장: ' + person.name, d => {
       d.requests ||= [];
       if (editing) Object.assign(d.requests.find(q => q.id === editing.id)!, fields, { updatedAt: new Date().toISOString() });
       else d.requests.unshift({ ...newStamp(), ...fields, excelJobId: '', round: Math.max(0,...d.requests.filter(q => q.candidateId === person.id && q.stage === fields.stage).map(q => q.round)) + 1 });

@@ -75,7 +75,7 @@ export default function Page() {
       setBusy(false);
     }
   }
-  function save(e: FormEvent<HTMLFormElement>) {
+  async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     const f = new FormData(e.currentTarget);
@@ -111,7 +111,7 @@ export default function Page() {
       return;
     }
     if (
-      commit(stage + ' ' + state + ' 저장', (d) => {
+      await commit(stage + ' ' + state + ' 저장', (d) => {
         d.requests ||= [];
         if (editing)
           Object.assign(d.requests.find((q) => q.id === editing.id)!, fields, {
@@ -457,9 +457,9 @@ export default function Page() {
             </button>
             <button
               className="btn-primary"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  commit('엑셀 ' + plan.rows + '행을 가져왔습니다.', (d) => {
+                  await commit('엑셀 ' + plan.rows + '행을 가져왔습니다.', (d) => {
                     if (
                       cleanDemo &&
                       d.activity.length === 0 &&

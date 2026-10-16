@@ -36,7 +36,7 @@ export default function Page() {
     }
   }, []);
   const close = () => setEditing(undefined);
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const f = new FormData(event.currentTarget);
     const fields = {
@@ -54,7 +54,7 @@ export default function Page() {
       status: value(f, 'status') as Interview['status'],
     };
     if (
-      commit(
+      await commit(
         '면접 일정 ' +
           (data.candidates.find((c) => c.id === fields.candidateId)?.name ||
             '') +

@@ -36,7 +36,7 @@ export function AppUpdate() {
   }
   return <section id="app-update" className="card space-y-4 p-6" aria-label="앱 업데이트">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">앱 업데이트</h2><p className="mt-1 text-sm text-slate-500">현재 버전 {info?.currentVersion || '확인 중'}</p></div><RefreshCw className={busy ? 'animate-spin text-teal-700' : 'text-teal-700'} size={22}/></div>
-    <p className="text-sm leading-6 text-slate-600">GitHub 릴리스에서 새 버전을 받아 검증한 뒤 앱을 다시 시작합니다. 브라우저 데이터와 엑셀 연결 설정은 유지됩니다.</p>
+    <p className="text-sm leading-6 text-slate-600">GitHub 릴리스에서 새 버전을 받아 검증한 뒤 앱을 다시 시작합니다. 노트북 DB와 엑셀 연결 설정은 유지됩니다.</p>
     <label className="block text-sm font-medium">GitHub 릴리스 저장소<input className="field mt-2 max-w-lg" placeholder="소유자/저장소" value={repository} disabled={busy} onChange={e => setRepository(e.target.value)} /></label>
     <p className="text-xs leading-6 text-slate-500">공개 저장소의 최신 정식 릴리스에 앱 배포 파일이 있어야 합니다. 저장소 주소가 바뀌면 이곳에서 수정할 수 있습니다.</p>
     <div className="flex flex-wrap gap-2"><button className="btn-secondary" disabled={busy || !repository.trim() || !info} onClick={() => void check()}><RefreshCw size={15} className="mr-2"/>업데이트 확인</button>{info?.availableVersion && <button className="btn-primary" disabled={busy} onClick={() => setConfirm(true)}><Download size={16} className="mr-2"/>새 버전 업데이트</button>}</div>

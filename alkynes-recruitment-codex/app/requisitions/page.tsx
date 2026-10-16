@@ -18,7 +18,7 @@ export default function Page() {
     [group, setGroup] = useState('active'),
     [removing, setRemoving] = useState<Requisition | null>(null);
   const close = () => setEditing(undefined);
-  function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const fields = {
@@ -41,7 +41,7 @@ export default function Page() {
     )
       return;
     if (
-      commit(
+      await commit(
         '채용 요청 ' +
           fields.department +
           ' / ' +
@@ -149,7 +149,7 @@ export default function Page() {
         <p className="mb-3">{removing.department} · {removing.role} 채용요청을 삭제하시겠습니까?</p>
         <p className="mb-4 text-sm text-red-700">연결된 지원자 {data.candidates.filter(c => c.requisitionId === removing.id).length}명과 전형 요청·면접·평가도 함께 삭제됩니다. 복구하려면 설정에서 미리 백업해 주세요.</p>
         {removing.excelKey && <p className="mb-4 text-sm">엑셀 원본은 변경되지 않습니다. 원본에 남아 있으면 다음 엑셀 반영 시 다시 등록됩니다.</p>}
-        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setRemoving(null)}>취소</button><button className="btn-primary" onClick={() => { if (commit('채용 요청 삭제: ' + removing.role, d => removeJob(d, removing.id))) setRemoving(null); }}>삭제 확인</button></div>
+        <div className="flex justify-end gap-2"><button className="btn-secondary" onClick={() => setRemoving(null)}>취소</button><button className="btn-primary" onClick={async () => { if (await commit('채용 요청 삭제: ' + removing.role, d => removeJob(d, removing.id))) setRemoving(null); }}>삭제 확인</button></div>
       </Modal>}
       {editing !== undefined && (
         <Modal

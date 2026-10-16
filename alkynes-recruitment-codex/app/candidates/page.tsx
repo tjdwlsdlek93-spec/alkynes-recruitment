@@ -68,7 +68,7 @@ export default function Page() {
       if (!fields.name || !fields.requisitionId)
         throw Error('채용건과 지원자 이름을 입력해 주세요.');
       if (
-        commit(
+        await commit(
           '지원자 ' +
             fields.name +
             ': ' +
@@ -369,9 +369,9 @@ export default function Page() {
             </button>
             <button
               className="btn-primary"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  commit(
+                  await commit(
                     removing.name +
                       ' 지원자와 연결된 면접·평가를 삭제했습니다.',
                     (d) => {

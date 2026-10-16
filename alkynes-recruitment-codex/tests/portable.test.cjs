@@ -88,6 +88,9 @@ test('update worker restarts the app and restores the previous version when repl
       await fs.cp(path.resolve(__dirname, '../portable'), root, { recursive: true });
       await fs.mkdir(path.join(root, 'site')); await fs.writeFile(path.join(root, 'site', 'dashboard.html'), 'old');
       await fs.mkdir(dataDir); await fs.writeFile(path.join(dataDir, 'excel-source.json'), 'keep-this-config');
+      const { DatabaseSync } = require('node:sqlite');
+      const savedDb = new DatabaseSync(path.join(dataDir, 'recruitment.sqlite'));
+      savedDb.exec("CREATE TABLE preserved(payload TEXT); INSERT INTO preserved VALUES ('private recruitment records');"); savedDb.close();
       await fs.mkdir(path.join(stage, 'site'), { recursive: true });
       for (const name of ['server.cjs', 'excel-source.cjs', 'update.cjs', 'update-worker.cjs', 'setup.cjs', 'version.json']) await fs.copyFile(path.join(root, name), path.join(stage, name));
       await fs.writeFile(path.join(stage, 'version.json'), JSON.stringify({ app: 'alkynes-recruitment', version: '2026.10.14.5' }));
@@ -102,6 +105,8 @@ test('update worker restarts the app and restores the previous version when repl
       for (let n = 0; !(running = await health()); n++) { if (n > 50) throw Error('Restart failed'); await delay(100); }
       assert.equal(running.version, fail ? require('../portable/version.json').version : '2026.10.14.5');
       assert.equal(await fs.readFile(path.join(dataDir, 'excel-source.json'), 'utf8'), 'keep-this-config');
+      const restoredDb = new DatabaseSync(path.join(dataDir, 'recruitment.sqlite'));
+      assert.equal(restoredDb.prepare('SELECT payload FROM preserved').get().payload, 'private recruitment records'); restoredDb.close();
       const result = JSON.parse(await fs.readFile(path.join(dataDir, 'update-result.json'), 'utf8'));
       assert.equal(result.ok, !fail);
     } finally {
