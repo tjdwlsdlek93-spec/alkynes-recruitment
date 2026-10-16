@@ -55,11 +55,11 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
 .board-date strong { display:block; margin-top:8px; font-size:22px; letter-spacing:-.04em; }
 .board-date small { display:block; margin-top:5px; color:#6b6144; font-size:11px; }
 .metric-note { position:relative; display:flex; flex-direction:column; min-height:153px; overflow:hidden; padding:18px 19px; border-radius:7px; box-shadow:3px 3px 0 var(--line); }
-.metric-paper:nth-child(1) { --note-color:#fff0a8; }
-.metric-paper:nth-child(2) { --note-color:var(--blue); }
-.metric-paper:nth-child(3) { --note-color:var(--lilac); }
-.metric-paper:nth-child(4) { --note-color:var(--mint); }
-.metric-paper:nth-child(5) { --note-color:var(--peach); }
+.metric-paper:nth-child(1) { --note-color:#fff0a8; --fold-color:#ffd65a; }
+.metric-paper:nth-child(2) { --note-color:var(--blue); --fold-color:#b9d2f3; }
+.metric-paper:nth-child(3) { --note-color:var(--lilac); --fold-color:#ccb6e8; }
+.metric-paper:nth-child(4) { --note-color:var(--mint); --fold-color:#b9d5a8; }
+.metric-paper:nth-child(5) { --note-color:var(--peach); --fold-color:#eebca3; }
 .metric-note .metric-label { max-width:calc(100% - 15px); font-size:12px; font-weight:700; color:#555044; line-height:1.5; }
 .metric-note .metric-value { margin-top:auto; padding-top:13px; font-size:40px; font-weight:800; line-height:1.1; letter-spacing:-.06em; color:var(--ink); }
 .metric-note .metric-caption { margin-top:7px; font-size:10px; line-height:1.5; color:#746c5c; }
@@ -207,3 +207,9 @@ dialog[open] { animation:dialog-appear .2s ease-out backwards; }
 .metric-note .metric-label { font-size:16px; font-weight:800; color:var(--ink); letter-spacing:-.025em; }
 main .card h2:not(.metric-label),.calendar-panel h2 { font-size:18px; line-height:1.5; font-weight:800; }
 .dashboard-hero .intro strong { font-weight:800; color:#443c24; }
+
+/* Illustrated paper fold: flat color, ink outline and a tiny playful response. */
+.metric-fold { transform-origin:100% 100%; }
+@keyframes fold-peek { 0%,100% { transform:rotate(0); } 45% { transform:translate(-1px,1px) rotate(-7deg); } 75% { transform:rotate(2deg); } }
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) { .metric-paper:hover .metric-fold { animation:fold-peek .36s ease-out; } }
+@media(prefers-reduced-motion:reduce) { .metric-fold { animation:none !important; transform:none !important; } }
