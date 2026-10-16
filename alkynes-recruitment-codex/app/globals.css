@@ -213,3 +213,25 @@ main .card h2:not(.metric-label),.calendar-panel h2 { font-size:18px; line-heigh
 @keyframes fold-peek { 0%,100% { transform:rotate(0); } 45% { transform:translate(-1px,1px) rotate(-7deg); } 75% { transform:rotate(2deg); } }
 @media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) { .metric-paper:hover .metric-fold { animation:fold-peek .36s ease-out; } }
 @media(prefers-reduced-motion:reduce) { .metric-fold { animation:none !important; transform:none !important; } }
+
+
+/* Candidate progression: readable pastel labels with distinct status icons. */
+.candidate-status { --status-bg:#eeebe4; --status-ink:#575146; --status-line:#bdb4a4; position:relative; display:inline-flex; align-items:center; gap:6px; padding:6px 10px; white-space:nowrap; border:1.25px solid var(--status-line); border-radius:7px; background:var(--status-bg); color:var(--status-ink); font-size:14px; line-height:1.45; font-weight:800; vertical-align:middle; }
+.candidate-status > svg { flex-shrink:0; }
+.candidate-status--passed { --status-bg:#e1f1ea; --status-ink:#24634e; --status-line:#94bea8; }
+.candidate-status--scheduled { --status-bg:#e0ecfc; --status-ink:#285b91; --status-line:#96b5d9; }
+.candidate-status--completed { --status-bg:#ede4f8; --status-ink:#67438b; --status-line:#bba1d4; }
+.candidate-status--coordination { --status-bg:#fff0d4; --status-ink:#83591b; --status-line:#d9b77d; }
+.candidate-status--celebration { --status-bg:#fff0a4; --status-ink:#6c4900; --status-line:#b18a2b; box-shadow:2px 2px 0 #d2a94355; }
+.candidate-status--confirmed { --status-bg:#dfefd8; --status-ink:#3e6630; --status-line:#a1bf91; }
+.candidate-status--rejected { --status-bg:#f6e2e0; --status-ink:#944a48; --status-line:#d2a2a0; }
+.candidate-status--withdrawn { --status-bg:#f1e8e0; --status-ink:#78604e; --status-line:#c7b1a0; }
+.candidate-status--attention { --status-bg:#ffe7cc; --status-ink:#914b12; --status-line:#d5a16b; }
+.candidate-status--ended { --status-bg:#e7e7e3; --status-ink:#65665c; --status-line:#b4b5ab; }
+.candidate-confetti { position:absolute; inset:0; pointer-events:none; }
+.candidate-confetti i { position:absolute; left:50%; top:50%; width:4px; height:7px; border-radius:1px; opacity:0; animation:candidate-cheer .85s cubic-bezier(.15,.65,.35,1) both; }
+.candidate-confetti i:nth-child(3n) { width:5px; height:5px; border-radius:50%; }
+@keyframes candidate-cheer { 0% { opacity:0; transform:translate(-50%,-50%) scale(.3); } 16% { opacity:1; } 65% { opacity:.9; } 100% { opacity:0; transform:translate(calc(-50% + var(--confetti-x)),calc(-50% + var(--confetti-y))) rotate(var(--confetti-turn)) scale(.85); } }
+@keyframes candidate-popper { 0%,100% { transform:rotate(0); } 35% { transform:rotate(-12deg) scale(1.12); } 70% { transform:rotate(7deg); } }
+@media(hover:hover) and (pointer:fine) { .candidate-status--celebration:hover .candidate-status-popper { animation:candidate-popper .45s ease-out; } }
+@media(prefers-reduced-motion:reduce) { .candidate-confetti i,.candidate-status-popper { animation:none !important; transform:none !important; opacity:0; } .candidate-status-popper { opacity:1; } }

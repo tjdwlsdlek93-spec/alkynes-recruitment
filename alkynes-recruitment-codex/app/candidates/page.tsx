@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { koreaDate } from '@/lib/scheduling';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
+import { CandidateStatusBadge } from '@/components/CandidateStatusBadge';
 import { candidateStatuses, newStamp, type Candidate } from '@/lib/recruitment';
 import { candidateStatus, endedCandidate, finalStatus } from '@/lib/candidate-state';
 import { closedJob, latestRequest } from '@/lib/recruitment-view';
@@ -187,7 +188,7 @@ export default function Page() {
                 <td className="px-5 py-4">{c.source || '—'}</td>
                 <td className="px-5 py-4">{c.career || '—'}</td>
                 <td className="px-5 py-4">
-                  <span className="badge bg-slate-100">{candidateStatus(c)}</span>
+                  <CandidateStatusBadge status={candidateStatus(c)} />
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex gap-2">
