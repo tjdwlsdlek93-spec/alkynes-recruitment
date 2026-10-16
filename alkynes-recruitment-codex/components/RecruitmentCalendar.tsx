@@ -29,7 +29,7 @@ export function RecruitmentCalendar() {
         <div>
           <span className="section-label">SCHEDULE</span><h2 className="font-bold">채용 캘린더</h2>
           <p className="mt-1 text-xs text-slate-500">
-            면접 · 요청 접수 · 미완료 요청 마감 / 한국시간
+            면접 · 요청 접수 · 미완료 요청 마감
           </p>
         </div>
         <div className="flex items-center gap-2">

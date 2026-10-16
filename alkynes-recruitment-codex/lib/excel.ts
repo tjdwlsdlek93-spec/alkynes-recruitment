@@ -407,7 +407,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
   data.requests ||= [];
   upsert(data.requests, plan.requests.map(q => {
     const old = data.requests!.find(row => row.id === q.id);
-    return q.stage === '인적성 검사 요청' ? { ...q, examStatus: old?.examStatus || (q.examAt ? '검사예정' as const : '미실시' as const) } : q;
+    return q.stage === '인적성 검사 요청' ? { ...q, examDeadline: old?.examDeadline || '', examStatus: old?.examStatus || (q.examAt ? '검사예정' as const : '미실시' as const) } : q;
   }));
   upsert(
     data.interviews,

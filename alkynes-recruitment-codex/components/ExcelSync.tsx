@@ -347,30 +347,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
     <SyncContext.Provider
       value={{ status, working, preview, pause, refresh: () => poll(true) }}
     >
-      {status.enabled && (
-        <div
-          role="status"
-          className={
-            'mb-4 rounded-xl border px-4 py-3 text-sm ' +
-            (status.phase === 'error'
-              ? 'border-amber-200 bg-amber-50 text-amber-900'
-              : 'border-emerald-100 bg-emerald-50 text-emerald-900')
-          }
-        >
-          Excel 자동 연결 · {status.path.split(/[\\/]/).pop()} ·{' '}
-          {status.phase === 'checking' ? '변경 확인 중' : status.message}
-          <span className="ml-2 text-xs">
-            마지막 반영{' '}
-            {status.lastSuccess ? formatDate(status.lastSuccess) : '아직 없음'}
-          </span>
-          {status.phase === 'error' && (
-            <span className="block text-xs">
-              기존 데이터는 유지됩니다. 파일 저장·네이버웍스 동기화 완료 후 다시
-              확인합니다.
-            </span>
-          )}
-        </div>
-      )}
+      {status.enabled && status.phase === 'error' && <p role="alert" className="mb-4 text-sm text-red-700">엑셀 반영 실패: {status.message}</p>}
       {children}
       {pending && (
         <Modal

@@ -78,7 +78,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
   for (const q of data.requests || []) {
     if (q.stage === '인적성 검사 요청' && q.examAt && q.status !== '취소') events.push({
       id: 'aptitude-' + q.id, date: koreaDate(q.examAt), time: time(q.examAt),
-      title: labels(q.requisitionId, q.candidateId) + ' 인적성 검사 · ' + q.round + '회차',
+      title: labels(q.requisitionId, q.candidateId) + ' 인적성 검사',
       status: data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) ? '전형 종료' : q.examStatus || '검사예정', timing: '', href: '/aptitudes',
     });
     if (q.receivedAt)
@@ -89,10 +89,7 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
         title:
           labels(q.requisitionId, q.candidateId) +
           ' ' +
-          q.stage +
-          ' · ' +
-          q.round +
-          '회차',
+          q.stage,
         status: q.status,
         timing: data.candidates.some(c => c.id === q.candidateId && endedCandidate(c)) ? '전형 종료' : requestTiming(q),
         href: '/requests?request=' + q.id,
@@ -122,7 +119,6 @@ export function requestsCSV(data: RecruitmentData) {
     '지원자ID',
     '지원자명',
     '단계',
-    '회차',
     '접수일시',
     '처리기한',
     '완료일시',
@@ -164,7 +160,6 @@ export function requestsCSV(data: RecruitmentData) {
       c?.id || '',
       c?.name || '',
       q.stage,
-      q.round,
       datetime(q.receivedAt),
       datetime(q.dueAt),
       datetime(q.completedAt),

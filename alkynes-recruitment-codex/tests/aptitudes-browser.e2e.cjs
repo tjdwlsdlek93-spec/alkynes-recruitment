@@ -26,6 +26,7 @@ test('aptitude requests keep request processing separate from exam completion an
     await dialog.locator('input[name=dueAt]').fill('2026-10-16T18:00');
     await dialog.locator('select[name=status]').selectOption('요청 완료');
     await dialog.locator('input[name=completedAt]').fill('2026-10-15T10:00');
+    await dialog.locator('input[name=examDeadline]').fill('2026-10-19T18:00');
     await dialog.locator('input[name=examAt]').fill('2026-10-16T14:00');
     await dialog.locator('select[name=examStatus]').selectOption('검사예정');
     await dialog.locator('input[name=owner]').fill('검증담당자');
@@ -42,8 +43,10 @@ test('aptitude requests keep request processing separate from exam completion an
     assert.ok((await content.inputValue()).includes('검증지원자'));
     assert.ok(!(await content.inputValue()).includes('공유금지'));
     assert.ok(!(await content.inputValue()).includes('비공유연락처'));
-    await share.getByLabel('공유 대상').selectOption('candidate');
-    assert.ok((await content.inputValue()).includes('별도 안내'));
+    assert.equal(await share.getByLabel('공유 대상').count(), 0);
+    assert.ok((await content.inputValue()).includes('요청 완료했습니다.'));
+    assert.ok((await content.inputValue()).includes('응시기한: 2026년 10월 19일'));
+    assert.ok(!/처리기한|검사 일정|실시 상태|회차|회신/.test(await content.inputValue()));
     await content.fill((await content.inputValue()) + '\n검증용 추가 안내');
     await share.getByRole('button', { name: '카톡 메시지 복사', exact: true }).click();
     await share.getByText('복사했습니다. 카카오톡 대화방에 붙여넣어 전송하세요.', { exact: true }).waitFor();
@@ -63,7 +66,7 @@ test('aptitude requests keep request processing separate from exam completion an
     const interviewShare = page.getByRole('dialog', { name: '면접 일정 카톡 안내문', exact: true });
     await interviewShare.getByLabel('공유 대상').selectOption('candidate');
     const text = await interviewShare.getByLabel('공유 안내문', { exact: true }).inputValue();
-    assert.ok(text.includes('검증회의실')); assert.ok(!text.includes('검증면접관'));
+    assert.ok(text.includes('(주) 알킨스 사무동 3층 영업부 회의실')); assert.ok(text.includes('청북중앙로 578-19')); assert.ok(text.startsWith('안녕하세요, 알킨스 경영지원팀 민성진 과장입니다.')); assert.ok(!text.includes('회신')); assert.ok(!text.includes('검증면접관'));
     await interviewShare.getByRole('button', { name: '닫기', exact: true }).last().click();
     await page.setViewportSize({ width: 1280, height: 720 });
     const quick = await page.getByLabel('빠른 업데이트', { exact: true }).boundingBox();

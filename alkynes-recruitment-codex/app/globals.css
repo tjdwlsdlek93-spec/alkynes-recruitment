@@ -4,7 +4,7 @@
 
 :root { --ink:#292722; --paper:#fffdf7; --canvas:#f7f3e8; --line:#35322c; --yellow:#ffe36b; --mint:#e2eedc; --blue:#e4edf9; --lilac:#eee6f8; --peach:#f9e3d7; }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--canvas); color:var(--ink); font-family:Arial,'Apple SD Gothic Neo','Malgun Gothic',sans-serif; -webkit-font-smoothing:antialiased; }
+body { margin:0; background:var(--canvas); color:var(--ink); font-family:'NanumSquareRound','Apple SD Gothic Neo','Malgun Gothic',sans-serif; font-size:16px; -webkit-font-smoothing:antialiased; }
 h1,h2,h3 { color:var(--ink); letter-spacing:-.035em; }
 main { max-width:1900px; }
 .card,.job-card { border:1.5px solid var(--line); border-radius:10px; background:var(--paper); box-shadow:3px 3px 0 #35322c; }
@@ -103,6 +103,65 @@ dialog::backdrop { background:#29272270; backdrop-filter:blur(3px); }
   .sidebar-footer [aria-label='빠른 업데이트'] { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .sidebar-footer [aria-label='빠른 업데이트'] > * { margin:0 !important; }
   .sidebar-footer [aria-label='빠른 업데이트'] p { grid-column:span 2; font-size:11px; line-height:1.6; }
-  .sidebar-footer [aria-label='빠른 업데이트'] p:last-child { display:none; }
+
   .sidebar-footer .btn-secondary { min-height:35px; padding:6px 10px; }
+}
+
+@font-face { font-family:'NanumSquareRound'; font-style:normal; font-weight:400; font-display:swap; src:url('/fonts/NanumSquareRoundR.woff2') format('woff2'); }
+@font-face { font-family:'NanumSquareRound'; font-style:normal; font-weight:700; font-display:swap; src:url('/fonts/NanumSquareRoundB.woff2') format('woff2'); }
+@font-face { font-family:'NanumSquareRound'; font-style:normal; font-weight:800; font-display:swap; src:url('/fonts/NanumSquareRoundEB.woff2') format('woff2'); }
+.text-xs { font-size:14px; line-height:1.5; }
+.text-sm { font-size:16px; line-height:1.6; }
+.text-base { font-size:18px; }
+.text-lg { font-size:20px; }
+.text-xl { font-size:22px; }
+.text-2xl { font-size:26px; }
+.text-3xl { font-size:32px; }
+.btn,.btn-primary,.btn-secondary,.field,.nav-item { font-size:16px; }
+.badge,thead th { font-size:14px; }
+.sidebar-footer .btn-secondary { font-size:14px; }
+.segmented button { font-size:15px; }
+.segmented span { font-size:14px; }
+.board-eyebrow { font-size:12px; }
+.dashboard-hero h1 { font-size:42px; }
+.dashboard-hero .intro { font-size:15px; }
+.board-date strong { font-size:24px; }
+.board-date small { font-size:13px; }
+.metric-note .metric-label { font-size:14px; }
+.metric-note .metric-value { font-size:42px; }
+.metric-note .metric-caption { font-size:12px; }
+.section-label { font-size:11px; }
+/* Keep calendar typography sizes while using the same rounded font. */
+.calendar-panel .text-xs { font-size:12px; line-height:16px; }
+.calendar-panel .text-sm { font-size:14px; line-height:20px; }
+.calendar-panel .text-base { font-size:16px; }
+.calendar-panel .text-lg { font-size:18px; }
+.calendar-panel .text-xl { font-size:20px; }
+.calendar-panel .btn,.calendar-panel .btn-primary,.calendar-panel .btn-secondary,.calendar-panel .field { font-size:14px; }
+.calendar-panel .badge { font-size:12px; }
+.calendar-panel .section-label { font-size:9px; }
+.sync-timestamp { overflow-wrap:anywhere; }
+@media(max-width:767px) { .nav-item { font-size:14px; } .sidebar-footer .sync-timestamp { font-size:12px; } }
+@media(max-width:640px) { .dashboard-hero h1 { font-size:35px; } }
+
+/* Paper layers and restrained elevation for the recruitment board. */
+.card,.job-card { box-shadow:3px 4px 0 #35322c,0 8px 17px -13px #29272270; }
+.dashboard-hero,.recruitment-hero { box-shadow:4px 5px 0 var(--line),0 12px 20px -15px #29272270; }
+.metric-note { background-image:linear-gradient(135deg,#ffffff30 0%,transparent 55%,#29272208 100%); box-shadow:3px 4px 0 var(--line),0 12px 18px -13px #29272280; }
+.metric-note::after { width:23px; height:23px; background:linear-gradient(45deg,#29272218 0%,#ffffffb0 49%,#ffffff45 51%); box-shadow:-2px 2px 3px #2927220a; }
+.board-date { box-shadow:3px 4px 0 var(--line),0 10px 16px -11px #29272280; }
+.desk-note { background-image:linear-gradient(145deg,#ffffff38,transparent 70%,#29272206); }
+.desk-note::before { box-shadow:0 2px 3px #29272212; }
+.btn,.btn-primary,.btn-secondary,.nav-item,.segmented button { transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease,border-color .18s ease; }
+.metric-note,.job-card { transition:transform .2s ease,box-shadow .2s ease; }
+@media(hover:hover) and (pointer:fine) {
+  .btn:not(:disabled):hover,.btn-primary:not(:disabled):hover,.btn-secondary:not(:disabled):hover { transform:translateY(-3px); box-shadow:2px 4px 0 var(--line),0 8px 12px -9px #29272280; }
+  .nav-item:hover { transform:translateY(-2px); box-shadow:2px 3px 0 #35322c45; }
+  .nav-item.active:hover { box-shadow:3px 5px 0 var(--line); }
+  .segmented button:not(:disabled):hover { transform:translateY(-2px); box-shadow:1px 3px 0 #35322c55; background:var(--paper); }
+  .metric-note:hover,.job-card:hover { transform:translateY(-3px); box-shadow:4px 7px 0 var(--line),0 14px 20px -14px #29272290; }
+}
+.btn:not(:disabled):active,.btn-primary:not(:disabled):active,.btn-secondary:not(:disabled):active,.nav-item:active,.segmented button:not(:disabled):active { transform:translateY(1px); box-shadow:1px 1px 0 var(--line); }
+@media(prefers-reduced-motion:reduce) {
+  .btn,.btn-primary,.btn-secondary,.nav-item,.segmented button,.metric-note,.job-card { transform:none !important; transition:none !important; }
 }

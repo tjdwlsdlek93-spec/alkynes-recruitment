@@ -90,7 +90,7 @@ export default function Page() {
       candidateId: candidate,
       excelJobId: value(f, 'excelJobId'),
       stage: stage as ProcessRequest['stage'],
-      round: Number(f.get('round')),
+      round: editing?.round || Math.max(0, ...(data.requests || []).filter(q => q.requisitionId === req && q.candidateId === candidate && q.stage === stage).map(q => q.round)) + 1,
       receivedAt: iso(received),
       dueAt: iso(due),
       completedAt: state === '요청 전' ? '' : iso(completed),
@@ -231,7 +231,7 @@ export default function Page() {
                     {r?.role} · {c?.name || '채용건 공통'}
                   </span>
                   <p className="text-xs text-slate-500">
-                    {r?.code} · {q.stage} · {q.round}회차{' '}
+                    {r?.code} · {q.stage}{' '}
                     {q.sourceRow && '· 원본 ' + q.sourceRow + '행'}
                   </p>
                 </div>
@@ -334,17 +334,7 @@ export default function Page() {
                 ))}
               </select>
             </Field>
-            <Field label="회차">
-              <input
-                className="field"
-                type="number"
-                name="round"
-                min="1"
-                required
-                defaultValue={editing?.round || 1}
-              />
-            </Field>
-            <Field label="접수일시 * (한국시간)">
+            <Field label="접수일시 *">
               <input
                 className="field"
                 type="datetime-local"
@@ -357,7 +347,7 @@ export default function Page() {
                 }}
               />
             </Field>
-            <Field label="처리기한 * (한국시간)">
+            <Field label="처리기한 *">
               <input
                 className="field"
                 type="datetime-local"
@@ -377,7 +367,7 @@ export default function Page() {
                 ))}
               </select>
             </Field>
-            <Field label="처리완료일시 (한국시간)">
+            <Field label="처리완료일시">
               <input
                 className="field"
                 type="datetime-local"

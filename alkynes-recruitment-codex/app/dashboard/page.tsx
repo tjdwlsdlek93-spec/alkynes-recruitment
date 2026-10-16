@@ -58,7 +58,7 @@ export default function Dashboard() {
       </div>
       <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside">
       <div className="card week-note p-5">
-        <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접 · 한국시간 기준</h2>
+        <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접</h2>
         {thisWeek.map((i) => (
           <Link
             className="block rounded-xl border p-3 mb-2 text-sm"

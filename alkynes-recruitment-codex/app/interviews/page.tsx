@@ -106,15 +106,7 @@ export default function Page() {
       close();
   }
   async function copy(i: Interview) {
-    const c = data.candidates.find((c) => c.id === i.candidateId)!;
-    const r = data.requisitions.find((r) => r.id === c.requisitionId)!;
-    const text = [
-      '[알킨스 면접 안내]',
-      c.name + '님 / ' + r.department + ' · ' + r.role,
-      '일시: ' + formatDate(i.startsAt) + ' (한국시간)',
-      '장소: ' + i.location,
-      '면접관: ' + i.interviewers.join(' / '),
-    ].join('\n');
+    const text = interviewMessage(data, i, 'internal');
     try {
       await navigator.clipboard.writeText(text);
       setMessage('면접 안내문을 복사했습니다.');
@@ -173,7 +165,7 @@ export default function Page() {
             <div className="card p-5" key={i.id}>
               <div className="flex justify-between gap-2">
                 <span className="text-sm text-slate-500">
-                  {formatDate(i.startsAt)} (한국시간)
+                  {formatDate(i.startsAt)}
                 </span>
                 <span className={"badge " + (group === 'completed' ? 'bg-slate-100 text-slate-600' : group === 'review' ? 'bg-amber-50 text-amber-800' : 'bg-teal-50 text-teal-700')}>{classify(i) === 'review' ? '확인 필요' : classify(i) === 'cancelled' && i.status !== '취소' ? '전형 종료' : i.status}</span>
               </div>
@@ -267,7 +259,7 @@ export default function Page() {
                 />
               )}
             </Field>
-            <Field label="면접일시 * (한국시간)">
+            <Field label="면접일시 *">
               <input
                 className="field"
                 type="datetime-local"
