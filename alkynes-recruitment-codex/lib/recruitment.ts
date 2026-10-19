@@ -72,6 +72,7 @@ export type Interview = Stamped & {
   startsAt: string;
   location: string;
   interviewers: string[];
+  pastInterviewers?: string[];
   source?: string;
   verification?: string;
   status: '면접예정' | '면접완료' | '취소' | '확인 필요';
@@ -415,6 +416,7 @@ export function validateData(value: unknown): value is RecruitmentData {
         Array.isArray(i.interviewers) &&
         i.interviewers.length > 0 &&
         i.interviewers.every((x) => typeof x === 'string' && x.trim()) &&
+        (i.pastInterviewers === undefined || (Array.isArray(i.pastInterviewers) && i.pastInterviewers.every(x => typeof x === 'string' && x.trim()) && new Set(i.pastInterviewers).size === i.pastInterviewers.length)) &&
         ['면접예정', '면접완료', '취소', '확인 필요'].includes(i.status) &&
         d.candidates.some((c) => c.id === i.candidateId),
     )
@@ -431,7 +433,7 @@ export function validateData(value: unknown): value is RecruitmentData {
         ratings.includes(e.cultureFit) &&
         recommendations.includes(e.overall) &&
         d.interviews.some(
-          (i) => i.id === e.interviewId && i.interviewers.includes(e.evaluator),
+          (i) => i.id === e.interviewId && [...i.interviewers, ...(i.pastInterviewers || [])].includes(e.evaluator),
         ),
     )
   )

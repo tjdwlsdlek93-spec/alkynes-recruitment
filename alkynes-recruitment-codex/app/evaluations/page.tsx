@@ -31,7 +31,7 @@ export default function Page() {
   );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!interview || !evaluator) return;
+    if (!interview || !evaluator || (!interview.interviewers.includes(evaluator) && !existing)) return;
     const f = new FormData(event.currentTarget);
     const fields = {
       interviewId,
@@ -104,8 +104,8 @@ export default function Page() {
             onChange={(e) => setEvaluator(e.target.value)}
           >
             <option value="">배정된 면접관 선택</option>
-            {interview?.interviewers.map((name) => (
-              <option key={name}>{name}</option>
+            {interview && [...interview.interviewers, ...(interview.pastInterviewers || [])].map((name) => (
+              <option key={name} value={name}>{name}{interview.interviewers.includes(name) ? '' : ' (이전 면접관 · 평가 기록)'}</option>
             ))}
           </select>
         </Field>
@@ -200,7 +200,7 @@ export default function Page() {
           평가 취합{' '}
           {interview &&
             '· ' +
-              data.evaluations.filter((e) => e.interviewId === interviewId)
+              data.evaluations.filter((e) => e.interviewId === interviewId && interview.interviewers.includes(e.evaluator))
                 .length +
               '/' +
               interview.interviewers.length +

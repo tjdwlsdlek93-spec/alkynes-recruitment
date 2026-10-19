@@ -16,6 +16,7 @@ export type ExcelPlan = {
   warnings: string[];
   rows: number;
   businessDays: number;
+  interviewFields?: { location: boolean; interviewers: boolean };
   sourceName: string;
 };
 function unwrap(v: CellValue): unknown {
@@ -135,6 +136,15 @@ export async function parseExcel(
     throw Error(
       '5행 A~P열의 제목이 10월 14일 파일 구조와 다릅니다. 열 제목을 확인해 주세요.',
     );
+  const optionalColumn = (names: string[]) => {
+    const columns: number[] = [];
+    for (let col = 17; col <= sheet.columnCount; col++) {
+      if (names.includes(text(sheet.getRow(5).getCell(col).value).replace(/\s+/g, ''))) columns.push(col);
+    }
+    if (columns.length > 1) throw Error(names[0] + ' 열이 중복되어 있습니다. 제목을 확인해 주세요.');
+    return columns[0] || 0;
+  };
+  const locationColumn = optionalColumn(['면접장소']), interviewerColumn = optionalColumn(['면접관', '면접관명']);
   const businessDays = Number(
     unwrap(book.getWorksheet('채용프로세스 요약')?.getCell('B11').value ?? 1),
   );
@@ -155,6 +165,7 @@ export async function parseExcel(
     warnings,
     rows: 0,
     businessDays,
+    interviewFields: { location: !!locationColumn, interviewers: !!interviewerColumn },
     sourceName,
   };
   const jobMap = new Map<string, Requisition>(),
@@ -312,6 +323,9 @@ export async function parseExcel(
         ['면접완료', '처우협의', '최종합격', '입사확정', '실제 입사'].includes(
           current,
         ) || !!actualJoin;
+      const previous = interviewMap.get(iid);
+      const location = locationColumn ? text(v(locationColumn)) : '';
+      const interviewers = interviewerColumn ? [...new Set(text(v(interviewerColumn)).split(/[,，;；\r\n]+/).map(name => name.trim()).filter(Boolean))] : [];
       interviewMap.set(iid, {
         ...stamp(iid),
         source: 'kpi-excel',
@@ -320,8 +334,8 @@ export async function parseExcel(
           (!completed ? '원본에서 면접 완료 여부를 확인해 주세요.' : ''),
         candidateId,
         startsAt: interviewAt,
-        location: '장소 미입력',
-        interviewers: ['면접관 미지정'],
+        location: location || previous?.location || '장소 미입력',
+        interviewers: interviewers.length ? interviewers : previous?.interviewers || ['면접관 미지정'],
         status: note.includes('면접취소')
           ? '취소'
           : completed
@@ -413,9 +427,10 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
     data.interviews,
     plan.interviews.map((i) => {
       const old = data.interviews.find((row) => row.id === i.id);
-      return old
-        ? { ...i, location: old.location, interviewers: old.interviewers }
-        : i;
+      const location = plan.interviewFields?.location ? i.location : old?.location || i.location;
+      const interviewers = plan.interviewFields?.interviewers ? i.interviewers : old?.interviewers || i.interviewers;
+      const pastInterviewers = [...new Set([...(old?.pastInterviewers || []), ...data.evaluations.filter(e => e.interviewId === i.id).map(e => e.evaluator)])].filter(name => !interviewers.includes(name));
+      return { ...i, location, interviewers, ...(pastInterviewers.length ? { pastInterviewers } : {}) };
     }),
   );
 }

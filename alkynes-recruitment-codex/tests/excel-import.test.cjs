@@ -335,3 +335,36 @@ test('a later unresolved request row cannot erase an explicit terminal stage', a
   const person = plan.candidates.find(c => c.name === '테스트갑');
   assert.equal(person.status, '전형종료'); assert.equal(person.excelStage, '전형종료');
 });
+
+test('optional interview fields update without duplicates, preserve evaluations and support older workbooks', async () => {
+  const book = new ExcelJS.Workbook(); await book.xlsx.load(await sample());
+  const sheet = book.getWorksheet('채용프로세스 적시성');
+  sheet.getCell('AF5').value = '면접장소'; sheet.getCell('AG5').value = '면접관';
+  sheet.getCell('AF7').value = '테스트 회의실'; sheet.getCell('AG7').value = '면접관갑, 면접관을\n면접관갑';
+  const parse = () => book.xlsx.writeBuffer().then(bytes => parseExcel(bytes, 'fields.xlsx'));
+  let plan = await parse();
+  const person = plan.candidates.find(c => c.name === '테스트갑');
+  const interview = plan.interviews.find(i => i.candidateId === person.id);
+  assert.equal(interview.location, '테스트 회의실');
+  assert.deepEqual(interview.interviewers, ['면접관갑', '면접관을']);
+  const data = seedData(); applyExcelPlan(data, plan);
+  const { ratings, recommendations } = load('recruitment');
+  data.evaluations.push({id:'saved-evaluation', createdAt:interview.createdAt, updatedAt:interview.updatedAt,
+    interviewId:interview.id, evaluator:'면접관갑', jobFit:ratings[0], capability:ratings[0], cultureFit:ratings[0], overall:recommendations[0], comment:'보존할 평가'});
+  assert.ok(validateData(data));
+  sheet.getCell('AF7').value = '변경 회의실'; sheet.getCell('AG7').value = '면접관병';
+  plan = await parse(); applyExcelPlan(data, plan);
+  let current = data.interviews.find(i => i.id === interview.id);
+  assert.equal(data.interviews.filter(i => i.id === interview.id).length, 1);
+  assert.equal(current.location, '변경 회의실'); assert.deepEqual(current.interviewers, ['면접관병']);
+  assert.deepEqual(current.pastInterviewers, ['면접관갑']); assert.ok(validateData(data));
+  applyExcelPlan(data, await parseExcel(await sample(), 'older.xlsx'));
+  current = data.interviews.find(i => i.id === interview.id);
+  assert.equal(current.location, '변경 회의실'); assert.deepEqual(current.interviewers, ['면접관병']);
+  sheet.getCell('AF7').value = null; sheet.getCell('AG7').value = null;
+  applyExcelPlan(data, await parse()); current = data.interviews.find(i => i.id === interview.id);
+  assert.equal(current.location, '장소 미입력'); assert.deepEqual(current.interviewers, ['면접관 미지정']);
+  assert.equal(data.evaluations.find(e => e.id === 'saved-evaluation').comment, '보존할 평가'); assert.ok(validateData(data));
+  current.pastInterviewers = '잘못된 형식'; assert.equal(validateData(data), false);
+  sheet.getCell('AH5').value = '면접관'; await assert.rejects(parse, /중복/);
+});
