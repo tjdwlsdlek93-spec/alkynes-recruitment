@@ -368,3 +368,19 @@ test('optional interview fields update without duplicates, preserve evaluations 
   current.pastInterviewers = '잘못된 형식'; assert.equal(validateData(data), false);
   sheet.getCell('AH5').value = '면접관'; await assert.rejects(parse, /중복/);
 });
+
+
+test('Korean weekday dates match interview messages and Korean midnight boundaries', () => {
+  const { formatDate, formatDateOnly } = load('recruitment');
+  const { interviewMessage } = load('messages');
+  const instant = '2026-10-22T05:00:00.000Z';
+  assert.equal(formatDate(instant), '2026년 10월 22일(목) 오후 2:00');
+  assert.equal(formatDateOnly('2026-10-22'), '2026년 10월 22일(목)');
+  assert.equal(formatDateOnly('2026-10-21T15:00:00.000Z'), '2026년 10월 22일(목)');
+  assert.equal(formatDateOnly('2026-10-21T14:59:00.000Z'), '2026년 10월 21일(수)');
+  const data = seedData(), interview = { ...data.interviews[0], startsAt: instant };
+  for (const audience of ['candidate', 'internal']) {
+    assert.ok(interviewMessage(data, interview, audience).includes('일시: 2026년 10월 22일(목) 오후 2:00'));
+  }
+  assert.equal(formatDate(''), '미정');
+});

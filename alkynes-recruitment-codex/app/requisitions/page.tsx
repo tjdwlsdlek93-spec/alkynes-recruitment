@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
 import {
+  formatDateOnly,
   newStamp,
   nextCode,
   type Requisition,
@@ -115,7 +116,7 @@ export default function Page() {
                   {r.role}
                 </div>
                 <div className="mt-1 text-sm text-slate-500">
-                  {r.department} · 목표 입사일 {r.targetJoin || '협의'} · 지원자{' '}
+                  {r.department} · 목표 입사일 {r.targetJoin ? formatDateOnly(r.targetJoin) : '협의'} · 지원자{' '}
                   {
                     data.candidates.filter((c) => c.requisitionId === r.id)
                       .length

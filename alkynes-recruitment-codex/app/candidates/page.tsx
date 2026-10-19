@@ -5,7 +5,7 @@ import { koreaDate } from '@/lib/scheduling';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
 import { CandidateStatusBadge } from '@/components/CandidateStatusBadge';
-import { candidateStatuses, newStamp, type Candidate } from '@/lib/recruitment';
+import { candidateStatuses, formatDateOnly, newStamp, type Candidate } from '@/lib/recruitment';
 import { candidateStatus, endedCandidate, finalStatus } from '@/lib/candidate-state';
 import { closedJob, latestRequest } from '@/lib/recruitment-view';
 export default function Page() {
@@ -224,10 +224,10 @@ export default function Page() {
               {finalStatus(editing.excelFinal) ? '최종 결과 반영 상태' : '엑셀 선발 단계'}: {finalStatus(editing.excelFinal) ? candidateStatus(editing) : editing.excelStage || '미입력'} · 최종 결과:{' '}
               {editing.excelFinal || '미입력'} · 입사예정일:{' '}
               {editing.expectedJoin
-                ? koreaDate(editing.expectedJoin)
+                ? formatDateOnly(editing.expectedJoin)
                 : '미입력'}{' '}
               · 실제입사일:{' '}
-              {editing.actualJoin ? koreaDate(editing.actualJoin) : '미입력'}
+              {editing.actualJoin ? formatDateOnly(editing.actualJoin) : '미입력'}
             </p>
           )}
           <form onSubmit={save}>

@@ -246,14 +246,20 @@ export function seedData(): RecruitmentData {
     activity: [],
   };
 }
+export function formatDateOnly(value: string) {
+  if (!value) return '미정';
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short',
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value || '';
+  return `${part('year')}년 ${part('month')}월 ${part('day')}일(${part('weekday')})`;
+}
 export function formatDate(value: string) {
-  return value
-    ? new Intl.DateTimeFormat('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(new Date(value))
-    : '미정';
+  if (!value) return '미정';
+  const time = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', hour: 'numeric', minute: '2-digit', hour12: true,
+  }).format(new Date(value));
+  return `${formatDateOnly(value)} ${time}`;
 }
 export function localDateTime(value: string) {
   if (!value) return '';

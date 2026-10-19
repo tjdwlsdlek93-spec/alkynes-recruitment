@@ -1,6 +1,7 @@
+import { formatDate } from './recruitment';
 import type { RecruitmentData, Interview, ProcessRequest } from './recruitment';
 export type Audience = 'internal' | 'candidate';
-const date = (value: string | undefined) => value ? new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'long', timeStyle: 'short' }).format(new Date(value)) : '[입력해 주세요]';
+const date = (value: string | undefined) => value ? formatDate(value) : '[입력해 주세요]';
 export const interviewRoom = '(주) 알킨스 사무동 3층 영업부 회의실';
 const address = '(경기도 평택시 청북읍 청북중앙로 578-19)';
 export function aptitudeMessage(data: RecruitmentData, q: ProcessRequest, _audience: Audience = 'internal') {

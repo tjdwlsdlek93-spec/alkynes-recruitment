@@ -1,4 +1,5 @@
 'use client';
+import { formatDateOnly } from '@/lib/recruitment';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRecruitment } from './RecruitmentProvider';
@@ -94,7 +95,7 @@ export function RecruitmentCalendar() {
                 <button
                   type="button"
                   key={date}
-                  aria-label={date + ' 일정 ' + rows.length + '건'}
+                  aria-label={formatDateOnly(date) + ' 일정 ' + rows.length + '건'}
                   aria-pressed={selected === date}
                   onClick={() => setSelected(date)}
                   className={
@@ -142,7 +143,7 @@ export function RecruitmentCalendar() {
         </div>
       </div>
       <div className="mt-4 space-y-2" aria-label="선택한 날짜 일정">
-        <h3 className="font-semibold">{selected} 일정</h3>
+        <h3 className="font-semibold">{formatDateOnly(selected)} 일정</h3>
         {events
           .filter((e) => e.date === selected)
           .map((e) => (

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { formatDate } from '@/lib/recruitment';
 import { Download, RefreshCw } from 'lucide-react';
 import { useExcelSync } from './ExcelSync';
 import { updateApi, waitForAppRestart } from './AppUpdate';
@@ -31,6 +32,6 @@ export function SidebarUpdateActions() {
     <button className="btn-secondary w-full gap-2 border-teal-200 text-teal-900" disabled={!!busy} onClick={() => void run('app')}>{busy === 'app' ? <RefreshCw size={15} className="animate-spin"/> : <Download size={15}/>} {busy === 'app' ? '앱 업데이트 중…' : '앱 업데이트'}</button>
     <button className="btn-secondary w-full gap-2 border-teal-200 text-teal-900" disabled={!!busy || sync.working || sync.status.available === null} onClick={() => void run('excel')}><RefreshCw size={15} className={busy === 'excel' ? 'animate-spin' : ''}/>{busy === 'excel' ? '엑셀 반영 중…' : '엑셀 업데이트'}</button>
     {message && <p role={error ? 'alert' : 'status'} className={'break-words text-xs leading-5 ' + (error ? 'text-red-700' : 'text-teal-800')}>{message}</p>}
-    <p className="sync-timestamp text-xs leading-5 text-slate-500">마지막 반영<br/>{sync.status.lastSuccess ? new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(sync.status.lastSuccess)) : '아직 없음'}</p>
+    <p className="sync-timestamp text-xs leading-5 text-slate-500">마지막 반영<br/>{sync.status.lastSuccess ? formatDate(sync.status.lastSuccess) : '아직 없음'}</p>
   </div>, target);
 }

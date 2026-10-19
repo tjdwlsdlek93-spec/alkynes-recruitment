@@ -6,7 +6,7 @@ import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Empty } from '@/components/Forms';
 import { koreaDate } from '@/lib/scheduling';
 import { RecruitmentCalendar } from '@/components/RecruitmentCalendar';
-import { formatDate } from '@/lib/recruitment';
+import { formatDate, formatDateOnly } from '@/lib/recruitment';
 import { closedJob, requestedPeople, latestRequest } from '@/lib/recruitment-view';
 export default function Dashboard() {
   const { data } = useRecruitment();
@@ -160,7 +160,7 @@ export default function Dashboard() {
                   </td>
                   <td className="px-5 py-4">{action}</td>
                   <td className="px-5 py-4">
-                    {r.targetJoin || '협의'}
+                    {r.targetJoin ? formatDateOnly(r.targetJoin) : '협의'}
                     {delayed && (
                       <span className="ml-2 text-xs text-amber-800">
                         목표일 지연
