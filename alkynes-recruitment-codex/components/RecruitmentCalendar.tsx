@@ -1,4 +1,5 @@
 'use client';
+import { calendarDay } from '@/lib/korean-holidays';
 import { formatDateOnly } from '@/lib/recruitment';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -76,7 +77,7 @@ export function RecruitmentCalendar() {
         <div className="min-w-[560px]">
           <div className="grid grid-cols-7 text-center text-xs text-slate-500">
             {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-              <div className="py-2" key={day}>
+              <div className={'py-2 ' + (day === '일' ? 'text-red-600' : day === '토' ? 'text-blue-600' : '')} key={day}>
                 {day}
               </div>
             ))}
@@ -90,12 +91,13 @@ export function RecruitmentCalendar() {
             ))}
             {Array.from({ length: days }, (_, i) => {
               const date = month + '-' + String(i + 1).padStart(2, '0'),
-                rows = events.filter((e) => e.date === date);
+                rows = events.filter((e) => e.date === date),
+                day = calendarDay(date);
               return (
                 <button
                   type="button"
                   key={date}
-                  aria-label={formatDateOnly(date) + ' 일정 ' + rows.length + '건'}
+                  aria-label={formatDateOnly(date) + (day.holidays.length ? ' ' + day.holidays.join(' · ') : '') + ' 일정 ' + rows.length + '건'}
                   aria-pressed={selected === date}
                   onClick={() => setSelected(date)}
                   className={
@@ -107,14 +109,16 @@ export function RecruitmentCalendar() {
                 >
                   <span
                     className={
-                      'text-sm ' +
+                      'text-sm font-semibold ' +
+                      (day.tone === 'red' ? 'text-red-600 ' : day.tone === 'blue' ? 'text-blue-600 ' : '') +
                       (today === date
-                        ? 'rounded-full bg-slate-900 px-2 py-1 text-white'
+                        ? 'rounded-full px-2 py-1 ' + (day.tone === 'red' ? 'bg-red-100 ring-1 ring-red-300' : day.tone === 'blue' ? 'bg-blue-100 ring-1 ring-blue-300' : 'bg-slate-900 text-white')
                         : '')
                     }
                   >
                     {i + 1}
                   </span>
+                  {day.holidays.length > 0 && <span className="mt-1 block break-keep text-[11px] font-semibold leading-4 text-red-600">{day.holidays.join(' · ')}</span>}
                   {rows.slice(0, 3).map((e) => (
                     <span
                       key={e.id}
@@ -144,6 +148,7 @@ export function RecruitmentCalendar() {
       </div>
       <div className="mt-4 space-y-2" aria-label="선택한 날짜 일정">
         <h3 className="font-semibold">{formatDateOnly(selected)} 일정</h3>
+        {calendarDay(selected).holidays.length > 0 && <p className="text-sm font-semibold text-red-600">{calendarDay(selected).holidays.join(' · ')}</p>}
         {events
           .filter((e) => e.date === selected)
           .map((e) => (

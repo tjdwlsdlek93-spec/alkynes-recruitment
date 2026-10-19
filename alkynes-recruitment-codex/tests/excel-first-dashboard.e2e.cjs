@@ -31,7 +31,7 @@ test('Excel-first UI removes create buttons, provides zero-record message previe
     assert.ok((await week.innerText()).includes('검증지원자C'));
     assert.ok(!(await week.innerText()).includes('검증지원자A'));
     assert.ok(!(await week.innerText()).includes('검증지원자B'));
-    await page.getByRole('button', { name: /2026-10-15 일정/ }).click();
+    await page.getByRole('button', { name: /2026년 10월 15일\(목\) 일정/ }).click();
     const details = page.getByLabel('선택한 날짜 일정', { exact: true });
     const text = await details.innerText();
     assert.ok(text.includes('전형 종료 · 입사포기')); assert.ok(text.includes('전형 종료 · 지원포기'));

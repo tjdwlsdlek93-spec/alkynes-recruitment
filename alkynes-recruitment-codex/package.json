@@ -7,14 +7,15 @@
     "build": "node scripts/prepare-database.cjs && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tests/recruitment.test.mjs tests/excel-import.test.cjs tests/portable.test.cjs tests/database.test.cjs",
-    "test:e2e": "node --test --test-concurrency=1 tests/excel-first-dashboard.e2e.cjs tests/aptitudes-browser.e2e.cjs tests/interviews-browser.e2e.cjs tests/sidebar-updates.e2e.cjs",
+    "test": "node --test tests/recruitment.test.mjs tests/excel-import.test.cjs tests/portable.test.cjs tests/database.test.cjs tests/korean-holidays.test.cjs",
+    "test:e2e": "node --test --test-concurrency=1 tests/excel-first-dashboard.e2e.cjs tests/aptitudes-browser.e2e.cjs tests/interviews-browser.e2e.cjs tests/sidebar-updates.e2e.cjs tests/calendar-holidays.e2e.cjs",
     "test:excel-browser": "node --test tests/excel-browser.e2e.cjs",
     "test:sqlite-browser": "node --test tests/sqlite-browser.e2e.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
+    "date-holidays": "3.37.0",
     "exceljs": "^4.4.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.3",
