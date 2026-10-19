@@ -106,6 +106,7 @@ export type ProcessRequest = Stamped & {
   completedAt: string;
   source?: string;
   sourceRow?: number;
+  excelValues?: Record<string, string>;
   appNotes?: string;
   examAt?: string;
   examDeadline?: string;
@@ -135,6 +136,7 @@ export type ExcelRun = {
   id: string;
   at: string;
   sourceName: string;
+  sourceModifiedAt?: string;
   counts: Record<string, number>;
   changes: ExcelChange[];
 };
@@ -512,6 +514,7 @@ export function validateData(value: unknown): value is RecruitmentData {
           (!q.examAt || Number.isFinite(Date.parse(q.examAt))) &&
           (!q.examDeadline || Number.isFinite(Date.parse(q.examDeadline))) &&
           (q.examStatus === undefined || ['미실시', '검사예정', '실시완료'].includes(q.examStatus)) &&
+          (q.excelValues === undefined || (!!q.excelValues && typeof q.excelValues === 'object' && !Array.isArray(q.excelValues) && Object.values(q.excelValues).every(v => typeof v === 'string'))) &&
           (q.sourceRow === undefined ||
             (Number.isInteger(q.sourceRow) && q.sourceRow > 0)) &&
           str(q, [
@@ -561,6 +564,7 @@ export function validateData(value: unknown): value is RecruitmentData {
     new Set(d.sharedNotices.map(n => n.kind + '|' + n.targetId + '|' + n.audience)).size !== d.sharedNotices.length)) return false;
   if (d.excelRuns !== undefined && (!Array.isArray(d.excelRuns) || !unique(d.excelRuns) ||
     !d.excelRuns.every(run => run && str(run, ['id', 'at', 'sourceName']) && Number.isFinite(Date.parse(run.at)) &&
+      (run.sourceModifiedAt === undefined || (typeof run.sourceModifiedAt === 'string' && Number.isFinite(Date.parse(run.sourceModifiedAt)))) &&
       run.counts && typeof run.counts === 'object' && !Array.isArray(run.counts) && Object.values(run.counts).every(n => Number.isSafeInteger(n) && n >= 0) &&
       Array.isArray(run.changes) && run.changes.every(change => change && str(change, ['entity', 'candidateId', 'label', 'detail']))))) return false;
   return (

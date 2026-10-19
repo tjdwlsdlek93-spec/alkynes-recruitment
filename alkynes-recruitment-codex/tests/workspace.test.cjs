@@ -80,3 +80,23 @@ test('Excel snapshots produce deduplicated change history and keep app-owned fie
   assert.ok(candidateTimeline(data,old.id).some(i=>i.title==='엑셀 반영 · 전형 종료'));
   assert.ok(validateData(data));
 });
+
+test('daily Excel history retains all updates, exposes note edits and groups by Korean file-save date', () => {
+  const { excelChanges, groupExcelRuns } = load('excel-changes');
+  const data=fixture(), job=data.requisitions[0], person=data.candidates[1];
+  job.id='excel-job-history';person.id='excel-person-history';person.requisitionId=job.id;
+  const q={id:'excel-request-history',createdAt:new Date(now).toISOString(),updatedAt:new Date(now).toISOString(),requisitionId:job.id,candidateId:person.id,excelJobId:job.id,stage:'면접 요청',round:1,receivedAt:'2026-10-20T00:00:00Z',dueAt:'',completedAt:'',status:'요청 전',owner:'',notes:'기존 비고',source:'kpi-excel',sourceRow:6,excelValues:{'비고':'기존 비고','현재 선발 단계':'면접예정'}};
+  data.requests=[q];
+  const changed=structuredClone(data);changed.requests[0].notes='변경 비고';changed.requests[0].excelValues['비고']='변경 비고';
+  const run=excelChanges(data,changed,'synthetic.xlsx','2026-10-22T04:00:00Z');
+  assert.equal(run.counts['요청 변경'],1);assert.ok(run.changes[0].detail.includes('비고: 기존 비고 → 변경 비고'));
+  run.sourceModifiedAt='2026-10-21T15:01:00Z';
+  const older={...structuredClone(run),id:'older',at:'2026-10-22T02:00:00Z',sourceModifiedAt:'2026-10-21T14:59:00Z'};
+  const groups=groupExcelRuns([run,{...run,id:'same-day',at:'2026-10-22T05:00:00Z'},older]);
+  assert.deepEqual(groups.map(g=>[g.date,g.runs.length,g.changes]),[['2026-10-22',2,2],['2026-10-21',1,1]]);
+  assert.equal(groups[0].counts['요청 변경'],2);assert.equal(groups[0].runs[0].id,'same-day');
+  const plan={jobs:[job],candidates:[person],requests:[changed.requests[0]],interviews:[],warnings:[],rows:1,businessDays:1,sourceName:'synthetic.xlsx',sourceModifiedAt:'2026-10-22T01:00:00Z'};
+  data.excelRuns=Array.from({length:35},(_,i)=>({...structuredClone(run),id:'saved-'+i}));
+  applyExcelSnapshot(data,plan);assert.equal(data.excelRuns.length,36);assert.equal(data.excelRuns[0].sourceModifiedAt,plan.sourceModifiedAt);
+  const latest=data.excelRuns[0].id;applyExcelSnapshot(data,plan);assert.equal(data.excelRuns.length,36);assert.equal(data.excelRuns[0].id,latest);
+});

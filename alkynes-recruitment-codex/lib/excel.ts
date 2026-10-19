@@ -1,3 +1,4 @@
+import { formatDate } from './recruitment';
 import { excelChanges } from './excel-changes';
 import { candidateStatus, finalStatus } from './candidate-state';
 import type { CellValue } from 'exceljs';
@@ -19,6 +20,7 @@ export type ExcelPlan = {
   businessDays: number;
   interviewFields?: { location: boolean; interviewers: boolean };
   sourceName: string;
+  sourceModifiedAt?: string;
 };
 function unwrap(v: CellValue): unknown {
   if (v && typeof v === 'object' && 'formula' in v) return v.result;
@@ -295,10 +297,15 @@ export async function parseExcel(
       stageRound = (roundGroups.get(roundKey) || 0) + 1;
     roundGroups.set(roundKey, stageRound);
     const id = await key('excel-request', [...group, String(round)]);
+    const dateValues: Record<number, string> = { 6: receivedAt, 7: completedAt, 8: cachedDue, 10: examAt, 11: interviewAt, 14: expectedJoin, 15: actualJoin };
+    const excelValues = Object.fromEntries(headers.map((header, index) => [header, index + 1 in dateValues ? (dateValues[index + 1] ? formatDate(dateValues[index + 1]) : '') : text(v(index + 1))]));
+    if (locationColumn) excelValues['면접장소'] = text(v(locationColumn));
+    if (interviewerColumn) excelValues['면접관'] = text(v(interviewerColumn));
     plan.requests.push({
       ...stamp(id),
       source: 'kpi-excel',
       sourceRow: n,
+      excelValues,
       verification,
       requisitionId: jobId,
       candidateId,
@@ -479,5 +486,6 @@ export function applyExcelSnapshot(data: RecruitmentData, plan: ExcelPlan) {
   for (const j of data.requisitions) if (jobs.has(j.id)) j.excelMissing = false;
   for (const c of data.candidates) if (people.has(c.id)) c.excelMissing = false;
   const run = excelChanges(before, data, plan.sourceName);
-  if (run.changes.length || !data.excelRuns?.length) data.excelRuns = [run, ...(data.excelRuns || [])].slice(0, 30);
+  if (plan.sourceModifiedAt) run.sourceModifiedAt = plan.sourceModifiedAt;
+  if (run.changes.length || !data.excelRuns?.length) data.excelRuns = [run, ...(data.excelRuns || [])];
 }

@@ -6,7 +6,7 @@ import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Empty } from '@/components/Forms';
 import { koreaDate } from '@/lib/scheduling';
 import { RecruitmentCalendar } from '@/components/RecruitmentCalendar';
-import { TodayWork, ExcelChangeHistory } from '@/components/WorkspaceOverview';
+import { TodayWork } from '@/components/WorkspaceOverview';
 import { formatDate, formatDateOnly } from '@/lib/recruitment';
 import { closedJob, requestedPeople, latestRequest } from '@/lib/recruitment-view';
 export default function Dashboard() {
@@ -62,8 +62,7 @@ export default function Dashboard() {
           </div></div>
         ))}
       </div>
-      <TodayWork /><ExcelChangeHistory compact />
-      <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside">
+      <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside"><TodayWork />
       <div className="card week-note p-5">
         <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접</h2>
         {thisWeek.map((i) => (

@@ -94,6 +94,7 @@ function binary(res, source) {
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'X-Alkynes-Revision': source.revision,
+    'X-Alkynes-Modified-At': source.modifiedAt,
     ETag: '"' + source.revision + '"',
   });
   res.end(source.content);

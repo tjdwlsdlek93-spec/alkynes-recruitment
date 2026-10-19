@@ -20,6 +20,7 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
       if(time){sheet.getCell('AF'+row).value='엑셀회의실';sheet.getCell('AG'+row).value='면접관갑';}
     }
     const file=path.join(root,'synthetic.xlsx');await book.xlsx.writeFile(file);
+    await fs.utimes(file,new Date('2026-10-21T00:00:00Z'),new Date('2026-10-21T00:00:00Z'));
     await fs.writeFile(path.join(config,'excel-source.json'),JSON.stringify({path:file,enabled:false,pausedAt:new Date().toISOString()}));
     await start();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
     const context=await browser.newContext({permissions:['clipboard-read','clipboard-write'],viewport:{width:1440,height:1100}}),page=await context.newPage(),errors=[];
@@ -27,7 +28,19 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'채용 현황',exact:true}).waitFor();
     const refresh=async()=>{await page.getByRole('button',{name:'엑셀 업데이트',exact:true}).click();await page.getByLabel('빠른 업데이트',{exact:true}).getByRole('status').filter({hasText:'엑셀 반영 완료'}).waitFor();};
     await refresh();let saved=await api();assert.equal(saved.data.interviews.length,2);assert.equal(saved.data.excelRuns.length,1);
-    await page.getByLabel('오늘 챙길 일',{exact:true}).getByText('오늘 면접',{exact:true}).first().waitFor();
+    const todo = page.getByLabel('오늘 챙길 일',{exact:true});
+    await todo.getByText('오늘 면접',{exact:true}).first().waitFor();
+    assert.equal(await page.getByLabel('엑셀 변경 내역',{exact:true}).count(),0);
+    for(const width of [1440,1280]) {
+      await page.setViewportSize({width,height:1100});
+      const calendarBox=await page.getByLabel('채용 일정 캘린더',{exact:true}).boundingBox(),todoBox=await todo.boundingBox(),weekBox=await page.locator('.week-note').boundingBox();
+      assert.ok(todoBox.x>=calendarBox.x+calendarBox.width-1,'tasks must sit beside calendar');
+      assert.ok(Math.abs(todoBox.y-calendarBox.y)<3,'calendar must start alongside task paper');
+      assert.ok(weekBox.y>=todoBox.y+todoBox.height,'tasks must precede weekly interviews');
+    }
+    assert.equal(await todo.evaluate(el=>getComputedStyle(el).animationName),'todo-paper-glow');
+    await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await todo.evaluate(el=>getComputedStyle(el).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});
+    await page.screenshot({path:'/workspace/scratch/dashboard-task-postit.png',fullPage:true});
     await page.goto(base+'/interviews');await page.getByLabel('면접 일정 겹침',{exact:true}).waitFor();
     assert.equal(await page.getByRole('button',{name:'면접 안내문 복사',exact:true}).count(),0);
     await page.getByRole('button',{name:'상세 / 앱 메모',exact:true}).first().click();let dialog=page.getByRole('dialog');
@@ -39,10 +52,23 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await dialog.getByRole('button',{name:'안내 완료로 표시',exact:true}).click();await dialog.getByRole('button',{name:'미안내로 변경',exact:true}).waitFor();
     await dialog.getByLabel('공유 대상',{exact:true}).selectOption('candidate');await dialog.getByRole('button',{name:'안내 완료로 표시',exact:true}).click();await dialog.getByRole('button',{name:'미안내로 변경',exact:true}).waitFor();
     await dialog.getByRole('button',{name:'닫기',exact:true}).last().click();assert.equal((await api()).data.sharedNotices.length,2);
-    sheet.getCell('AF6').value='변경회의실';await book.xlsx.writeFile(file);await refresh();
+    sheet.getCell('AF6').value='변경회의실';await book.xlsx.writeFile(file);await fs.utimes(file,new Date('2026-10-22T01:00:00Z'),new Date('2026-10-22T01:00:00Z'));await refresh();
     await page.getByText('지원자 · 변경 · 재안내 필요',{exact:true}).waitFor();await page.getByText('사내 · 변경 · 재안내 필요',{exact:true}).waitFor();
     saved=await api();assert.equal(saved.data.interviews[0].durationMinutes,30);assert.equal(saved.data.interviews[0].appNotes,'유지할 면접 메모');assert.equal(saved.data.excelRuns[0].counts['면접 변경'],1);
-    const runCount=saved.data.excelRuns.length;await refresh();assert.equal((await api()).data.excelRuns.length,runCount);
+    sheet.getCell('P6').value='오늘 수정한 비고';await book.xlsx.writeFile(file);await fs.utimes(file,new Date('2026-10-22T02:00:00Z'),new Date('2026-10-22T02:00:00Z'));await refresh();
+    const runCount=(await api()).data.excelRuns.length;await refresh();assert.equal((await api()).data.excelRuns.length,runCount);
+    await page.goto(base+'/requests');const history=page.getByLabel('엑셀 변경 내역',{exact:true});
+    assert.equal(await history.getByLabel('엑셀 수정일 선택',{exact:true}).inputValue(),'2026-10-22');
+    await history.getByText('비고: 원본 메모 → 오늘 수정한 비고',{exact:false}).waitFor();
+    await history.getByText('면접장소: 엑셀회의실 → 변경회의실',{exact:false}).first().waitFor();
+    assert.equal(await history.locator('article').count(),2);
+    await history.getByLabel('엑셀 수정일 선택',{exact:true}).selectOption('2026-10-21');
+    await history.getByText('신규 면접',{exact:true}).first().waitFor();
+    await history.getByLabel('엑셀 수정일 선택',{exact:true}).selectOption('2026-10-22');
+    await history.getByLabel('엑셀 수정 내용 검색',{exact:true}).fill('비고');
+    assert.equal(await history.locator('article').count(),1);
+    await history.getByLabel('엑셀 수정 내용 검색',{exact:true}).fill('');
+    await page.screenshot({path:'/workspace/scratch/excel-daily-history.png',fullPage:true});
     await page.goto(base+'/candidates');const personRow=page.getByRole('row').filter({hasText:'검증갑'});await personRow.getByRole('button',{name:'상세 / 수정',exact:true}).click();dialog=page.getByRole('dialog');
     assert.equal(await dialog.locator('input[name=name]').isDisabled(),true);await dialog.getByText(/지원자 진행 이력 ·/).click();await dialog.getByText('엑셀 반영 · 면접 변경',{exact:true}).waitFor();
     await dialog.locator('textarea[name=notes]').fill('유지할 지원자 메모');await dialog.getByRole('button',{name:'저장',exact:true}).click();await page.getByRole('dialog').waitFor({state:'detached'});

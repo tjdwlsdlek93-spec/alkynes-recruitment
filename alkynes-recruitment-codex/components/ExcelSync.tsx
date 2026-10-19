@@ -13,7 +13,7 @@ import { parseExcel, applyExcelSnapshot, type ExcelPlan } from '@/lib/excel';
 import { changeSummary } from '@/lib/excel-changes';
 import { download, formatDate } from '@/lib/recruitment';
 const META = 'alkynes.excelSync.v1';
-const IMPORT_SCHEMA = 5;
+const IMPORT_SCHEMA = 6;
 const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {
@@ -153,6 +153,8 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
         await response.arrayBuffer(),
         selectedPath.split(/[\\/]/).pop() || '연결 Excel',
       );
+      const modifiedAt = response.headers.get('X-Alkynes-Modified-At');
+      if (modifiedAt && Number.isFinite(Date.parse(modifiedAt))) plan.sourceModifiedAt = modifiedAt;
       if (
         !mounted.current ||
         connection.current.path !== selectedPath ||
@@ -261,6 +263,8 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
         await response.arrayBuffer(),
         path.split(/[\\/]/).pop() || '연결 Excel',
       );
+      const modifiedAt = response.headers.get('X-Alkynes-Modified-At');
+      if (modifiedAt && Number.isFinite(Date.parse(modifiedAt))) plan.sourceModifiedAt = modifiedAt;
       setPending({ path, revision, plan });
       pendingRef.current = true;
       setCleanDemo(demo(storeRef.current.data));

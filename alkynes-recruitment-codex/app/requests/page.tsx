@@ -65,6 +65,7 @@ export default function Page() {
       if (file.size > 8 * 1024 * 1024)
         throw Error('8MB 이하 .xlsx 파일을 선택해 주세요.');
       const next = await parseExcel(await file.arrayBuffer(), file.name);
+      if (file.lastModified) next.sourceModifiedAt = new Date(file.lastModified).toISOString();
       setPlan(next);
       setCleanDemo(
         data.activity.length === 0 &&
@@ -489,7 +490,8 @@ export default function Page() {
                     const before = structuredClone(d);
                     applyExcelPlan(d, plan);
                     const run = excelChanges(before, d, plan.sourceName);
-                    if (run.changes.length || !d.excelRuns?.length) d.excelRuns = [run, ...(d.excelRuns || [])].slice(0, 30);
+                    if (plan.sourceModifiedAt) run.sourceModifiedAt = plan.sourceModifiedAt;
+                    if (run.changes.length || !d.excelRuns?.length) d.excelRuns = [run, ...(d.excelRuns || [])];
                   })
                 ) {
                   setPlan(null);
