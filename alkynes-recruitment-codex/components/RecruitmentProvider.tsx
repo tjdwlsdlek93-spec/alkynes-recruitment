@@ -20,6 +20,7 @@ type Snapshot = {
   revision: number;
   updatedAt: string;
   databasePath: string;
+  backupWarning?: string;
 };
 type Store = {
   data: RecruitmentData;
@@ -88,7 +89,8 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
     [saving, setSaving] = useState(false),
     [storage, setStorage] = useState<Mode>('loading'),
     [databasePath, setDatabasePath] = useState(''),
-    [retry, setRetry] = useState(0);
+    [retry, setRetry] = useState(0),
+    [backupWarning, setBackupWarning] = useState('');
   const state = useRef({
     mode: 'loading' as Mode,
     revision: 0,
@@ -189,6 +191,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         state.current.mode = 'sqlite';
         setStorage('sqlite');
         setDatabasePath(snapshot.databasePath);
+        setBackupWarning(snapshot.backupWarning || '');
         adopt(removeLegacySamples(snapshot.data), snapshot.revision);
         setReady(true);
       } catch (error) {
@@ -220,6 +223,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
               'DB 데이터가 없어 새로 저장하지 않았습니다. 백업을 확인해 주세요.',
             );
           adopt(removeLegacySamples(next.data), next.revision);
+          setBackupWarning(next.backupWarning || '');
         }
       } catch (error) {
         if (active)
@@ -285,9 +289,10 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
             '입력 값이나 데이터 연결이 올바르지 않습니다. 저장하지 않았습니다.',
           );
         if (mode === 'sqlite') {
-          const ack = await database({ data: next, revision });
+          const ack = await database({ data: next, revision, ...(replacement ? { beforeRestore: true } : {}) });
           if (!ack) throw Error('DB 저장 결과를 확인하지 못했습니다.');
           revision = ack.revision;
+          setBackupWarning(ack.backupWarning || '');
         } else localStorage.setItem(storageKey, JSON.stringify(next));
         adopt(next, revision);
         state.current.blocked = false;
@@ -342,6 +347,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         replace,
       }}
     >
+      {backupWarning && <div role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">DB 저장은 유지되지만 {backupWarning}. 설정에서 백업 폴더를 확인해 주세요.</div>}
       {error && (
         <div
           role="alert"

@@ -205,3 +205,46 @@ test('a failed SQL write rolls back both current records and history without rep
     await fsp.rm(dir, { recursive: true, force: true });
   }
 });
+
+test('separate backups persist, verify restores, enforce retention and survive backup write failures without losing DB saves', async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'alkynes-backup-'));
+  const initial = seedData();
+  try {
+    await host(dir, async request => {
+      assert.equal((await request({ data: initial, revision:0 })).status,200);
+      let status=await request(undefined,'/backups');assert.equal(status.status,200);
+      assert.equal(status.body.files.length,1);
+      const daily=status.body.files[0].name;
+      assert.deepEqual(JSON.parse(await fsp.readFile(path.join(status.body.directory,daily),'utf8')),initial);
+      const manual=await request({action:'create'},'/backups');assert.equal(manual.status,200);
+      const saved=await request(undefined,'/backups/file?name='+manual.body.name);assert.deepEqual(saved.body.data,initial);
+      assert.equal((await request(undefined,'/backups/file?name=../../recruitment.sqlite')).status,400);
+      const next=structuredClone(initial);next.candidates[0].phone='복원 검증';
+      assert.equal((await request({data:next,revision:1,beforeRestore:true})).status,200);
+      status=await request(undefined,'/backups');
+      const beforeRestore=status.body.files.find(f=>f.name.includes('before-restore'));
+      assert.deepEqual(JSON.parse(await fsp.readFile(path.join(status.body.directory,beforeRestore.name),'utf8')),initial);
+      assert.deepEqual(JSON.parse(await fsp.readFile(path.join(status.body.directory,daily),'utf8')),next);
+      const directory=path.join(dir,'chosen-backups');
+      assert.equal((await request({action:'configure',directory},'/backups')).status,200);
+      for(let day=1;day<=35;day++){
+        const date=new Date(Date.UTC(2024,0,day)).toISOString().slice(0,10),file=path.join(directory,'alkynes-daily-'+date+'.json');
+        await fsp.writeFile(file,JSON.stringify(initial));await fsp.utimes(file,new Date(date),new Date(date));
+      }
+      status=await request(undefined,'/backups');assert.equal(status.body.files.length,30);
+      assert.equal((await request({action:'configure',directory:'relative-folder'},'/backups')).status,400);
+      const corrupt='alkynes-manual-123-abcdef12.json';await fsp.writeFile(path.join(directory,corrupt),'{}');
+      assert.equal((await request(undefined,'/backups/file?name='+corrupt)).status,400);
+      assert.deepEqual((await request()).body.data,next);
+      const blocked=path.join(dir,'blocked');await fsp.writeFile(blocked,'a file is not a directory');
+      await fsp.writeFile(path.join(dir,'backup-settings.json'),JSON.stringify({directory:blocked}));
+      const final=structuredClone(next);final.candidates[0].phone='백업 실패 중에도 DB 저장';
+      const ack=await request({data:final,revision:2});assert.equal(ack.status,200);assert.match(ack.body.backupWarning,/자동 백업 실패/);
+      assert.deepEqual((await request()).body.data,final);
+      assert.equal((await request({data:initial,revision:3,beforeRestore:true})).status,500);
+      assert.deepEqual((await request()).body.data,final);
+      assert.equal((await request({action:'configure',directory},'/backups')).status,200);
+      assert.equal((await request(undefined,'/backups',{Origin:'https://untrusted.test'})).status,403);
+    });
+  } finally { await fsp.rm(dir,{recursive:true,force:true}); }
+});

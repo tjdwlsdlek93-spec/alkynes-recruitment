@@ -23,6 +23,52 @@ function createDataHandler({ port, dataDir, validate }) {
       return false;
     }
   }
+  const backupSettingsFile = path.join(dataDir, 'backup-settings.json');
+  let backupError = '';
+  const backupPattern = /^alkynes-(daily-\d{4}-\d{2}-\d{2}|(?:manual|before-restore)-\d+-[a-f0-9]{8})\.json$/;
+  function backupDirectory() {
+    try {
+      const settings = JSON.parse(fs.readFileSync(backupSettingsFile, 'utf8'));
+      if (typeof settings.directory !== 'string' || !path.isAbsolute(settings.directory)) throw Error('백업 폴더 설정을 확인해 주세요.');
+      return settings.directory;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    return process.platform === 'win32' && process.env.USERPROFILE
+      ? path.join(process.env.USERPROFILE, 'Documents', 'AlkynesRecruitmentBackups')
+      : path.join(dataDir, 'backups');
+  }
+  function atomicFile(file, contents) {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    const tmp = file + '.' + require('node:crypto').randomUUID() + '.tmp';
+    try { fs.writeFileSync(tmp, contents, { mode: 0o600, flag: 'wx' }); fs.renameSync(tmp, file); }
+    finally { try { fs.unlinkSync(tmp); } catch {} }
+  }
+  function backupRows(directory) {
+    if (!fs.existsSync(directory)) return [];
+    return fs.readdirSync(directory).filter(name => backupPattern.test(name)).map(name => {
+      const stat = fs.lstatSync(path.join(directory, name));
+      return { name, at: stat.mtime.toISOString(), size: stat.size, file: stat.isFile() && !stat.isSymbolicLink() };
+    }).filter(row => row.file).sort((a,b) => b.at.localeCompare(a.at));
+  }
+  function writeBackup(payload, kind = 'daily', onlyIfMissing = false) {
+    const directory = backupDirectory();
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const suffix = kind === 'daily' ? today : Date.now() + '-' + require('node:crypto').randomBytes(4).toString('hex');
+    const name = 'alkynes-' + kind + '-' + suffix + '.json';
+    const file = path.join(directory, name);
+    if (!onlyIfMissing || !fs.existsSync(file)) atomicFile(file, payload);
+    // Keep 30 daily copies, 20 explicit copies, and 10 pre-restore snapshots.
+    for (const [prefix, limit] of [['daily', 30], ['manual', 20], ['before-restore', 10]]) {
+      for (const old of backupRows(directory).filter(row => row.name.startsWith('alkynes-' + prefix + '-')).slice(limit)) fs.unlinkSync(path.join(directory, old.name));
+    }
+    backupError = '';
+    return name;
+  }
+  function dailyBackup(sql, onlyIfMissing = true) {
+    try {
+      const current = sql.prepare('SELECT payload FROM workspace WHERE id=1').get();
+      if (current) { if (!valid(JSON.parse(current.payload))) throw Error('DB 데이터 검증 실패'); writeBackup(current.payload, 'daily', onlyIfMissing); }
+    } catch (error) { backupError = '자동 백업 실패: ' + (error.code || error.message); }
+  }
   const handler = async (req, res, name) => {
     const send = (status, value, headers = {}) => {
       res.writeHead(status, {
@@ -43,7 +89,7 @@ function createDataHandler({ port, dataDir, validate }) {
       return send(403, {
         error: '앱의 같은 주소에서만 저장소를 사용할 수 있습니다.',
       });
-    if (!['/__alkynes/data', '/__alkynes/data/migrate'].includes(name))
+    if (!['/__alkynes/data', '/__alkynes/data/migrate', '/__alkynes/data/backups', '/__alkynes/data/backups/file'].includes(name))
       return send(404, { error: '저장소 경로를 확인해 주세요.' });
     if (
       !['GET', 'POST'].includes(req.method) ||
@@ -52,7 +98,23 @@ function createDataHandler({ port, dataDir, validate }) {
       return send(405, { error: '허용되지 않은 요청입니다.' });
     try {
       const sql = open();
+      if (name === '/__alkynes/data/backups/file' && req.method === 'GET') {
+        const filename = new URL(req.url, 'http://localhost').searchParams.get('name') || '';
+        if (!backupPattern.test(filename)) return send(400, { error: '백업 파일 이름을 확인해 주세요.' });
+        const directory = backupDirectory(), file = path.join(directory, filename);
+        if (!backupRows(directory).some(row => row.name === filename)) return send(404, { error: '백업 파일을 찾을 수 없습니다.' });
+        const contents = fs.readFileSync(file, 'utf8');
+        const parsed = JSON.parse(contents);
+        if (!valid(parsed)) return send(400, { error: '백업 파일을 검증하지 못했습니다. 현재 데이터는 유지됩니다.' });
+        return send(200, { data: parsed, name: filename });
+      }
+      if (name === '/__alkynes/data/backups' && req.method === 'GET') {
+        dailyBackup(sql);
+        const directory = backupDirectory();
+        return send(200, { directory, files: backupRows(directory), error: backupError });
+      }
       if (req.method === 'GET') {
+        dailyBackup(sql);
         const metadata = sql
           .prepare('SELECT revision FROM workspace WHERE id=1')
           .get();
@@ -76,6 +138,7 @@ function createDataHandler({ port, dataDir, validate }) {
             updatedAt: row?.updated_at || '',
             databasePath,
             storage: 'sqlite',
+            backupWarning: backupError,
           },
           { ETag: '"' + revision + '"' },
         );
@@ -96,6 +159,25 @@ function createDataHandler({ port, dataDir, validate }) {
       } catch {
         return send(400, { error: '저장 형식이 올바르지 않습니다.' });
       }
+      if (name === '/__alkynes/data/backups') {
+        if (body?.action === 'configure') {
+          if (typeof body.directory !== 'string' || !path.isAbsolute(body.directory) || body.directory.includes('\0')) return send(400, { error: '백업 폴더의 전체 경로를 입력해 주세요.' });
+          const directory = path.normalize(body.directory);
+          fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+          // Verify write permission before replacing the previous setting.
+          const probe = path.join(directory, '.alkynes-write-' + require('node:crypto').randomUUID());
+          fs.writeFileSync(probe, '', { flag: 'wx', mode: 0o600 }); fs.unlinkSync(probe);
+          atomicFile(backupSettingsFile, JSON.stringify({ directory }));
+          dailyBackup(sql, false);
+          return send(200, { directory, error: backupError });
+        }
+        if (body?.action !== 'create') return send(400, { error: '백업 작업을 확인해 주세요.' });
+        const row = sql.prepare('SELECT payload FROM workspace WHERE id=1').get();
+        if (!row || !valid(JSON.parse(row.payload))) return send(400, { error: '백업할 데이터를 확인하지 못했습니다.' });
+        const filename = writeBackup(row.payload, 'manual');
+        return send(200, { name: filename, directory: backupDirectory() });
+      }
+      if (name.endsWith('/file')) return send(405, { error: '허용되지 않은 요청입니다.' });
       const migrating = name.endsWith('/migrate');
       if (
         !body ||
@@ -123,6 +205,7 @@ function createDataHandler({ port, dataDir, validate }) {
               '다른 창에서 먼저 저장했습니다. 최신 내용을 확인하고 다시 저장해 주세요.',
           });
         }
+        if (body.beforeRestore === true && previous) writeBackup(previous.payload, 'before-restore');
         const revision = body.revision + 1,
           updatedAt = new Date().toISOString();
         if (previous)
@@ -142,11 +225,13 @@ function createDataHandler({ port, dataDir, validate }) {
           'DELETE FROM history WHERE revision NOT IN (SELECT revision FROM history ORDER BY revision DESC LIMIT 5)',
         );
         sql.exec('COMMIT');
+        dailyBackup(sql, false);
         return send(200, {
           revision,
           updatedAt,
           databasePath,
           storage: 'sqlite',
+          backupWarning: backupError,
         });
       } catch (error) {
         try {

@@ -14,7 +14,7 @@ test('aptitude requests keep request processing separate from exam completion an
       const requisitions = [{ ...stamp, id: 'test-job', code: 'HR-2026-001', department: '검증부서', requester: '', role: '검증공고', headcount: 1, reason: '', duties: '', requirements: '', preferred: '', targetJoin: '', status: '진행중' }];
       const candidates = [{ ...stamp, id: 'test-person', requisitionId: 'test-job', name: '검증지원자', source: '', career: '', phone: '비공유연락처', email: '', status: '검토중', notes: '', resumeName: '', resumeData: '' }];
       const interviews = [{ ...stamp, id: 'test-meeting', candidateId: 'test-person', startsAt: '2099-10-16T05:00:00.000Z', location: '검증회의실', interviewers: ['검증면접관'], status: '면접예정' }];
-      localStorage.setItem('alkynes.recruitment.v1', JSON.stringify({ version: 1, requisitions, candidates, interviews, evaluations: [], activity: [], requests: [{ ...stamp, id: 'test-aptitude', requisitionId: 'test-job', candidateId: 'test-person', excelJobId: '', stage: '인적성 검사 요청', round: 1, receivedAt: '2026-10-14T00:00:00.000Z', dueAt: '', completedAt: '', status: '요청 전', owner: '', notes: '', source: 'kpi-excel' }] }));
+      localStorage.setItem('alkynes.recruitment.v1', JSON.stringify({ version: 1, requisitions, candidates, interviews, evaluations: [], activity: [], requests: [{ ...stamp, id: 'test-aptitude', requisitionId: 'test-job', candidateId: 'test-person', excelJobId: '', stage: '인적성 검사 요청', round: 1, receivedAt: '2026-10-14T00:00:00.000Z', dueAt: '2026-10-16T09:00:00.000Z', completedAt: '2026-10-15T01:00:00.000Z', status: '요청 완료', examAt: '2026-10-16T05:00:00.000Z', owner: '', notes: '', source: 'kpi-excel' }] }));
     });
     await page.reload();
     const nav = await page.locator('aside nav a').allTextContents(); assert.deepEqual(nav.slice(-2), ['엑셀 연동','설정']);
@@ -22,14 +22,10 @@ test('aptitude requests keep request processing separate from exam completion an
     await page.getByRole('button', { name: '상세 / 수정', exact: true }).click();
     const dialog = page.getByRole('dialog');
     assert.equal(await dialog.locator('select[name=candidateId]').inputValue(), 'test-person');
-    await dialog.locator('input[name=receivedAt]').fill('2026-10-14T09:00');
-    await dialog.locator('input[name=dueAt]').fill('2026-10-16T18:00');
-    await dialog.locator('select[name=status]').selectOption('요청 완료');
-    await dialog.locator('input[name=completedAt]').fill('2026-10-15T10:00');
+    for (const name of ['receivedAt','dueAt','completedAt','examAt','owner']) assert.equal(await dialog.locator('input[name=' + name + ']').isDisabled(), true);
+    assert.equal(await dialog.locator('select[name=status]').isDisabled(), true);
     await dialog.locator('input[name=examDeadline]').fill('2026-10-19T18:00');
-    await dialog.locator('input[name=examAt]').fill('2026-10-16T14:00');
     await dialog.locator('select[name=examStatus]').selectOption('검사예정');
-    await dialog.locator('input[name=owner]').fill('검증담당자');
     await dialog.locator('textarea[name=notes]').fill('공유금지 내부 메모');
     await dialog.getByRole('button', { name: '저장', exact: true }).click();
     await page.getByText('요청: 요청 완료', { exact: true }).waitFor();
@@ -49,7 +45,7 @@ test('aptitude requests keep request processing separate from exam completion an
     assert.ok(!/처리기한|검사 일정|실시 상태|회차|회신/.test(await content.inputValue()));
     await content.fill((await content.inputValue()) + '\n검증용 추가 안내');
     await share.getByRole('button', { name: '카톡 메시지 복사', exact: true }).click();
-    await share.getByText('복사했습니다. 카카오톡 대화방에 붙여넣어 전송하세요.', { exact: true }).waitFor();
+    await share.getByText('복사했습니다. 카카오톡에 전송한 뒤 안내 완료로 표시해 주세요.', { exact: true }).waitFor();
     assert.ok((await page.evaluate(() => navigator.clipboard.readText())).includes('검증용 추가 안내'));
     await share.getByRole('button', { name: '닫기', exact: true }).last().click();
     await page.getByRole('button', { name: '상세 / 수정', exact: true }).click();

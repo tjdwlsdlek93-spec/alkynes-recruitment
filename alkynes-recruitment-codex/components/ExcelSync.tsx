@@ -10,9 +10,10 @@ import {
 import { useRecruitment } from './RecruitmentProvider';
 import { Modal } from './Forms';
 import { parseExcel, applyExcelSnapshot, type ExcelPlan } from '@/lib/excel';
+import { changeSummary } from '@/lib/excel-changes';
 import { download, formatDate } from '@/lib/recruitment';
 const META = 'alkynes.excelSync.v1';
-const IMPORT_SCHEMA = 4;
+const IMPORT_SCHEMA = 5;
 const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {
@@ -158,17 +159,22 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
         (!force && !connection.current.enabled)
       )
         return { ok: false, message: '연결 설정이 변경되어 반영을 중단했습니다.' };
+      let summary = '변경 없음';
       if (
         !await storeRef.current.commit(
           '연결 Excel ' + plan.rows + '행 자동 반영',
-          (d) => applyExcelSnapshot(d, plan),
+          (d) => {
+            const previousRun = d.excelRuns?.[0]?.id;
+            applyExcelSnapshot(d, plan);
+            if (d.excelRuns?.[0]?.id !== previousRun) summary = changeSummary(d.excelRuns![0].counts);
+          },
         )
       )
         throw Error(
           '노트북 저장에 실패했습니다. 마지막으로 저장된 데이터를 유지합니다. DB 파일과 디스크 공간을 확인해 주세요.',
         );
       remember(selectedPath, incomingRevision);
-      return { ok: true, message: '엑셀 ' + plan.rows + '행 반영 완료' + (connection.current.enabled ? '' : ' · 자동 연결은 일시 중지 상태입니다.') };
+      return { ok: true, message: '엑셀 반영 완료 · ' + summary + (connection.current.enabled ? '' : ' · 자동 연결은 일시 중지 상태입니다.') };
     } catch (error) {
       failed(error);
       return { ok: false, message: error instanceof Error ? error.message : '엑셀 반영에 실패했습니다.' };

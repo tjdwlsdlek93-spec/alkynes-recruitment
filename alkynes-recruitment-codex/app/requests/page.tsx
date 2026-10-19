@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
+import { ExcelChangeHistory } from '@/components/WorkspaceOverview';
 import { ExcelSyncControls } from '@/components/ExcelSync';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
@@ -13,6 +14,7 @@ import {
   download,
   type ProcessRequest,
 } from '@/lib/recruitment';
+import { excelChanges } from '@/lib/excel-changes';
 import { defaultDueDate, requestTiming, requestsCSV } from '@/lib/scheduling';
 import {
   applyExcelPlan,
@@ -79,6 +81,14 @@ export default function Page() {
     e.preventDefault();
     setError('');
     const f = new FormData(e.currentTarget);
+    if (editing?.source === 'kpi-excel') {
+      if (await commit('전형 요청 개인 메모 저장', draft => {
+        const row = draft.requests?.find(q => q.id === editing.id);
+        if (!row) throw Error('원본 요청이 변경되었습니다. 다시 확인해 주세요.');
+        row.appNotes = value(f, 'notes');
+      })) setEditing(undefined);
+      return;
+    }
     const iso = (v: string) =>
       v ? new Date(v + ':00+09:00').toISOString() : '';
     if (state === '요청 완료' && !completed) {
@@ -161,7 +171,7 @@ export default function Page() {
           </button>
         </div>
       </div>
-      <ExcelSyncControls />
+      <ExcelSyncControls /><ExcelChangeHistory />
       <div className="card space-y-3 p-5">
         <h2 className="font-bold">엑셀 파일 직접 가져오기</h2>
         <p className="text-sm text-slate-600">
@@ -289,6 +299,8 @@ export default function Page() {
                 {error}
               </p>
             )}
+            {editing?.source === 'kpi-excel' && <p className="col-span-full rounded-xl bg-amber-50 p-3 text-sm">요청 정보는 엑셀에서 수정합니다. 개인 메모만 앱에 저장하며 다음 연동 후에도 유지됩니다.</p>}
+            <fieldset className="contents" disabled={editing?.source === 'kpi-excel'}>
             <Field label="채용건 *">
               <select
                 className="field"
@@ -392,20 +404,20 @@ export default function Page() {
                 defaultValue={editing?.excelJobId}
               />
             </Field>
+            </fieldset>
             <div className="col-span-full">
-              <Field label="업무 메모">
+              <Field label="개인 메모 (앱에만 저장)">
                 <textarea
                   className="field"
                   name="notes"
                   rows={3}
                   maxLength={3000}
-                  defaultValue={editing?.notes}
+                  defaultValue={editing?.source === 'kpi-excel' ? editing.appNotes : editing?.notes}
                 />
               </Field>
               <p className="mt-2 text-xs text-slate-500">
                 신규 요청의 기본기한은 다음 1영업일(주말 제외)입니다.
-                공휴일·회사 휴무일은 기한을 직접 조정해 주세요. 면접 일시는 면접
-                일정에서 등록합니다.
+                공휴일·회사 휴무일은 엑셀의 기한을 확인해 주세요. 면접 일시도 엑셀에서 관리합니다.
               </p>
             </div>
             <Actions onCancel={() => setEditing(undefined)} />
@@ -474,7 +486,10 @@ export default function Page() {
                       d.evaluations = [];
                       d.requests = [];
                     }
+                    const before = structuredClone(d);
                     applyExcelPlan(d, plan);
+                    const run = excelChanges(before, d, plan.sourceName);
+                    if (run.changes.length || !d.excelRuns?.length) d.excelRuns = [run, ...(d.excelRuns || [])].slice(0, 30);
                   })
                 ) {
                   setPlan(null);

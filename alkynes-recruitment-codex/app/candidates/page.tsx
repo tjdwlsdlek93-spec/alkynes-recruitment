@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { koreaDate } from '@/lib/scheduling';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
+import { CandidateTimeline } from '@/components/CandidateTimeline';
 import { CandidateStatusBadge } from '@/components/CandidateStatusBadge';
 import { candidateStatuses, formatDateOnly, newStamp, type Candidate } from '@/lib/recruitment';
 import { candidateStatus, endedCandidate, finalStatus } from '@/lib/candidate-state';
@@ -62,10 +63,12 @@ export default function Page() {
         phone: value(form, 'phone'),
         email: value(form, 'email'),
         status: value(form, 'status') as Candidate['status'],
-        notes: value(form, 'notes'),
+        notes: editing?.excelStage !== undefined ? editing.notes : value(form, 'notes'),
+        appNotes: editing?.excelStage !== undefined ? value(form, 'notes') : editing?.appNotes,
         resumeData,
         resumeName,
       };
+      if (editing?.excelStage !== undefined) Object.assign(fields, { requisitionId: editing.requisitionId, name: editing.name, source: editing.source, status: editing.status });
       if (!fields.name || !fields.requisitionId)
         throw Error('채용건과 지원자 이름을 입력해 주세요.');
       if (
@@ -78,6 +81,9 @@ export default function Page() {
             fields.status,
           (draft) => {
             if (editing) {
+              const current = draft.candidates.find(c => c.id === editing.id);
+              if (!current) throw Error('원본 지원자가 변경되었습니다. 다시 확인해 주세요.');
+              if (current.excelStage !== undefined) Object.assign(fields, { requisitionId: current.requisitionId, name: current.name, source: current.source, status: current.status, notes: current.notes });
               Object.assign(
                 draft.candidates.find((c) => c.id === editing.id)!,
                 fields,
@@ -230,6 +236,8 @@ export default function Page() {
               {editing.actualJoin ? formatDateOnly(editing.actualJoin) : '미입력'}
             </p>
           )}
+          {editing && <CandidateTimeline candidateId={editing.id} />}
+          {editing?.excelStage !== undefined && <p className="mb-4 text-sm text-slate-500">이름·채용건·진행상태는 엑셀에서 수정합니다. 연락처·이력서·개인 메모는 앱에만 저장합니다.</p>}
           <form onSubmit={save}>
             <fieldset
               disabled={busy}
@@ -239,6 +247,7 @@ export default function Page() {
                 <select
                   className="field"
                   name="requisitionId"
+                  disabled={editing?.excelStage !== undefined}
                   required
                   defaultValue={editing?.requisitionId || req || ''}
                 >
@@ -254,6 +263,7 @@ export default function Page() {
                 <input
                   className="field"
                   name="name"
+                  disabled={editing?.excelStage !== undefined}
                   required
                   maxLength={80}
                   defaultValue={editing?.name}
@@ -263,6 +273,7 @@ export default function Page() {
                 <input
                   className="field"
                   name="source"
+                  disabled={editing?.excelStage !== undefined}
                   maxLength={80}
                   placeholder="사람인, 잡코리아, 추천 등"
                   defaultValue={editing?.source}
@@ -298,6 +309,7 @@ export default function Page() {
                 <select
                   className="field"
                   name="status"
+                  disabled={editing?.excelStage !== undefined}
                   defaultValue={editing?.status || '검토중'}
                 >
                   {candidateStatuses.map((s) => (
@@ -329,13 +341,13 @@ export default function Page() {
                 </div>
               )}
               <div className="col-span-full">
-                <Field label="메모">
+                <Field label="개인 메모 (앱에만 저장)">
                   <textarea
                     className="field"
                     name="notes"
                     rows={3}
                     maxLength={3000}
-                    defaultValue={editing?.notes}
+                    defaultValue={editing?.excelStage !== undefined ? editing.appNotes : editing?.notes}
                   />
                 </Field>
               </div>

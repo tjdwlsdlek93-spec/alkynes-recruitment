@@ -33,7 +33,7 @@ test('sidebar buttons update Excel and install app without leaving current page;
     const app = actions.getByRole('button', { name: '앱 업데이트', exact: true });
     const excel = actions.getByRole('button', { name: '엑셀 업데이트', exact: true });
     await excel.click();
-    await actions.getByText('엑셀 1행 반영 완료 · 자동 연결은 일시 중지 상태입니다.', { exact: true }).waitFor();
+    await actions.getByText(/엑셀 반영 완료.*신규 요청 1건.*자동 연결은 일시 중지 상태/, { exact: true }).waitFor();
     assert.ok((await actions.locator('.sync-timestamp').innerText()).includes('마지막 반영'));
     assert.ok(!(await actions.locator('.sync-timestamp').innerText()).includes('아직 없음'));
     assert.equal(await page.getByText('앱 업데이트 시 완료 후 화면이 다시 열립니다.', { exact: true }).count(), 0);

@@ -34,6 +34,15 @@ export default function Page() {
       targetJoin: value(form, 'targetJoin'),
       status: (editing && closedJob(editing) === (value(form, 'status') === '채용완료') ? editing.status : value(form, 'status')) as Requisition['status'],
     };
+    if (editing?.excelKey) {
+      if (await commit('채용 앱 관리 정보 저장', draft => {
+        const row = draft.requisitions.find(r => r.id === editing.id);
+        if (!row) throw Error('채용 원본이 변경되었습니다. 다시 확인해 주세요.');
+        // These supplementary fields are not supplied by the current workbook.
+        Object.assign(row, { headcount: fields.headcount, reason: fields.reason, duties: fields.duties, requirements: fields.requirements, preferred: fields.preferred });
+      })) close();
+      return;
+    }
     if (
       !fields.department ||
       !fields.role ||
@@ -164,10 +173,12 @@ export default function Page() {
             <p className="col-span-full text-sm text-slate-500">
               채용번호: {editing?.code || '저장 시 자동 생성'} · * 필수 항목
             </p>
+            {editing?.excelKey && <p className="col-span-full rounded-xl bg-amber-50 p-3 text-sm">부서·직무·요청자·채용상태·목표 입사일은 엑셀에서 수정합니다. 인원·상세 업무 내용은 앱에서 보완할 수 있습니다.</p>}
             <Field label="요청부서 *">
               <input
                 className="field"
                 name="department"
+                disabled={!!editing?.excelKey}
                 required
                 maxLength={80}
                 defaultValue={editing?.department}
@@ -177,6 +188,7 @@ export default function Page() {
               <input
                 className="field"
                 name="role"
+                disabled={!!editing?.excelKey}
                 required
                 maxLength={80}
                 defaultValue={editing?.role}
@@ -197,6 +209,7 @@ export default function Page() {
               <input
                 className="field"
                 name="requester"
+                disabled={!!editing?.excelKey}
                 maxLength={80}
                 defaultValue={editing?.requester}
               />
@@ -205,6 +218,7 @@ export default function Page() {
               <input
                 className="field"
                 name="targetJoin"
+                disabled={!!editing?.excelKey}
                 type="date"
                 defaultValue={editing?.targetJoin}
               />
@@ -213,6 +227,7 @@ export default function Page() {
               <select
                 className="field"
                 name="status"
+                disabled={!!editing?.excelKey}
                 defaultValue={editing && closedJob(editing) ? '채용완료' : '진행중'}
               >
                 <option value="진행중">채용중</option>

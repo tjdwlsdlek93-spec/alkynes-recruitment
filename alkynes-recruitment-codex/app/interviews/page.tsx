@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { NoticeBadges } from '@/components/NoticeBadges';
+import { interviewConflicts } from '@/lib/workspace';
 import { interviewGroup } from '@/lib/interview-state';
 import { MessageLauncher } from '@/components/MessageLauncher';
 import { ShareMessage } from '@/components/ShareMessage';
@@ -22,7 +24,6 @@ export default function Page() {
     [candidate, setCandidate] = useState(''),
     [job, setJob] = useState(''),
     [group, setGroup] = useState('scheduled'),
-    [message, setMessage] = useState(''),
     [sharing, setSharing] = useState<Interview | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('candidate') || '';
@@ -39,6 +40,15 @@ export default function Page() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const f = new FormData(event.currentTarget);
+    if (editing?.source === 'kpi-excel') {
+      if (await commit('면접 앱 메모·소요시간 저장', draft => {
+        const row = draft.interviews.find(i => i.id === editing.id);
+        if (!row) throw Error('원본 일정이 변경되었습니다. 다시 확인해 주세요.');
+        row.durationMinutes = Number(f.get('durationMinutes'));
+        row.appNotes = value(f, 'appNotes');
+      })) close();
+      return;
+    }
     const fields = {
       candidateId: value(f, 'candidateId'),
       startsAt: new Date(value(f, 'startsAt') + ':00+09:00').toISOString(),
@@ -52,6 +62,8 @@ export default function Page() {
         ),
       ],
       status: value(f, 'status') as Interview['status'],
+      durationMinutes: Number(f.get('durationMinutes')),
+      appNotes: value(f, 'appNotes'),
     };
     if (
       await commit(
@@ -105,16 +117,6 @@ export default function Page() {
     )
       close();
   }
-  async function copy(i: Interview) {
-    const text = interviewMessage(data, i, 'internal');
-    try {
-      await navigator.clipboard.writeText(text);
-      setMessage('면접 안내문을 복사했습니다.');
-    } catch {
-      setMessage('클립보드를 사용할 수 없어 안내문을 파일로 내려받았습니다.');
-      download('면접안내.txt', text, 'text/plain;charset=utf-8');
-    }
-  }
   const classify = (i: Interview) => interviewGroup(data, i);
   const scope = data.interviews.filter(i => {
     const person = data.candidates.find(c => c.id === i.candidateId);
@@ -125,6 +127,8 @@ export default function Page() {
     const date = (id: string) => rows.find(i => data.candidates.find(c => c.id === i.candidateId)?.requisitionId === id)?.startsAt || '';
     return group === 'completed' ? date(b.id).localeCompare(date(a.id)) : date(a.id).localeCompare(date(b.id));
   });
+  const conflicts = interviewConflicts(data);
+  const shared = sharing ? data.interviews.find(i => i.id === sharing.id) || sharing : null;
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -150,11 +154,7 @@ export default function Page() {
           {data.candidates.filter(c => !job || c.requisitionId === job).map(c => <option key={c.id} value={c.id}>{c.name} · {data.requisitions.find(r => r.id === c.requisitionId)?.role}</option>)}
         </select>
       </div>
-      {message && (
-        <p role="status" className="text-sm text-emerald-700">
-          {message}
-        </p>
-      )}
+      {conflicts.length > 0 && <section className="card space-y-3 border-red-200 bg-red-50 p-5" aria-label="면접 일정 겹침"><h2>일정 겹침 {conflicts.length}건</h2><p className="text-xs text-slate-600">입력한 소요시간 기준입니다. 미입력 시 60분으로 확인합니다.</p>{conflicts.map(pair => <p key={pair.first.id + pair.second.id} className="text-sm text-red-800">{data.candidates.find(c => c.id === pair.first.candidateId)?.name} / {data.candidates.find(c => c.id === pair.second.candidateId)?.name} · {formatDate(pair.first.startsAt)} · {pair.reasons.join(' / ')}</p>)}</section>}
       {jobs.map(jobRow => <section key={jobRow.id} className="space-y-3" aria-label={'채용공고: ' + jobRow.role}>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-teal-50 px-5 py-4"><div><h2 className="font-bold text-teal-900">{jobRow.role}</h2><p className="mt-1 text-xs text-teal-700">{jobRow.department} · {jobRow.code}</p></div><span className="badge bg-white text-teal-800">{rows.filter(i => data.candidates.find(c => c.id === i.candidateId)?.requisitionId === jobRow.id).length}건</span></div>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -180,18 +180,17 @@ export default function Page() {
                 {r.department} · {c.name}
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                {i.location} · {i.interviewers.join(' / ')}
+                {i.location} · {i.interviewers.join(' / ')} · {i.durationMinutes || 60}분{!i.durationMinutes && ' (기본)'}
               </div>
+              <NoticeBadges target={{ kind: 'interview', id: i.id }} />
+              {i.appNotes && <p className="mt-3 whitespace-pre-wrap text-sm text-slate-600">개인 메모: {i.appNotes}</p>}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button className="btn-secondary" onClick={() => setEditing(i)}>
-                  일정 수정
+                  {i.source === 'kpi-excel' ? '상세 / 앱 메모' : '일정 수정'}
                 </button>
                 {classify(i) !== 'cancelled' && (
                   <>
 <button className="btn-secondary" onClick={() => setSharing(i)}>카톡 안내문</button>
-                    <button className="btn-secondary" onClick={() => copy(i)}>
-                      면접 안내문 복사
-                    </button>
                     <button
                       className="btn-secondary"
                       onClick={() =>
@@ -225,13 +224,15 @@ export default function Page() {
           </Empty>
         </div>
       )}
-      {sharing && <ShareMessage title="면접 일정 카톡 안내문" generate={audience => interviewMessage(data, sharing, audience)} onClose={() => setSharing(null)} />}
+      {shared && <ShareMessage target={{ kind: 'interview', id: shared.id }} title="면접 일정 카톡 안내문" generate={audience => interviewMessage(data, shared, audience)} onClose={() => setSharing(null)} />}
       {editing !== undefined && (
         <Modal
-          title={editing ? '면접 일정 수정' : '면접 일정 등록'}
+          title={editing?.source === 'kpi-excel' ? '면접 상세 / 앱 메모' : editing ? '면접 일정 수정' : '면접 일정 등록'}
           onClose={close}
         >
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={save}>
+            {editing?.source === 'kpi-excel' && <p className="sm:col-span-2 rounded-xl bg-amber-50 p-3 text-sm">일시·장소·면접관·진행상태는 엑셀에서 수정하세요. 소요시간과 개인 메모는 앱에만 저장되며 연동 후에도 유지됩니다.</p>}
+            <fieldset className="contents" disabled={editing?.source === 'kpi-excel'}>
             <Field label="지원자 *">
               <select
                 className="field"
@@ -298,10 +299,9 @@ export default function Page() {
                 ))}
               </select>
             </Field>
-            <p className="text-sm text-slate-500">
-              일정 등록 시 지원자 상태도 면접예정으로 연결됩니다. 캘린더 일정은
-              기본 1시간입니다.
-            </p>
+            </fieldset>
+            <Field label="면접 소요시간 (분)"><input className="field" name="durationMinutes" type="number" min="5" max="480" step="5" required defaultValue={editing?.durationMinutes || 60}/></Field>
+            <Field label="개인 메모 (앱에만 저장)"><textarea className="field" name="appNotes" rows={3} maxLength={3000} defaultValue={editing?.appNotes}/></Field>
             <Actions onCancel={close} />
           </form>
         </Modal>

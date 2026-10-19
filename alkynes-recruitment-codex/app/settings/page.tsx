@@ -8,6 +8,7 @@ import {
   validateData,
   type RecruitmentData,
 } from '@/lib/recruitment';
+import { AutomaticBackups } from '@/components/AutomaticBackups';
 import { AppUpdate } from '@/components/AppUpdate';
 export default function Page() {
   const { data, replace, storage, databasePath, saving } = useRecruitment();
@@ -39,6 +40,7 @@ export default function Page() {
       </div>
       <AppUpdate />
       <div className="card space-y-3 p-6"><h2>데이터 저장소</h2><p className="font-bold">{storage === 'sqlite' ? '노트북 SQLite 저장' : '브라우저 저장 (미리보기 / 이전 서버)'}</p>{databasePath && <p className="break-all text-sm text-slate-600">{databasePath}</p>}<p className="text-sm text-slate-600">{storage === 'sqlite' ? '채용 기록은 이 노트북의 DB 파일에 저장됩니다. 브라우저 기록을 지워도 DB는 유지되며, 외부 서버로 전송하지 않습니다. 이전 시점의 브라우저 원본과 최근 5회 저장 이력도 DB에 보관합니다.' : '현재 서버에는 SQLite 저장 기능이 없습니다. 노트북 앱을 업데이트하면 기존 브라우저 데이터를 DB로 이전합니다.'}</p></div>
+      <AutomaticBackups onRestore={setBackup} />
       <div className="card space-y-4 p-6">
         <h2 className="font-bold">데이터 백업</h2>
         <p className="text-sm text-slate-600">
@@ -90,9 +92,9 @@ export default function Page() {
       {backup && (
         <Modal title="백업 복원 확인" onClose={() => setBackup(null)}>
           <p>
-            현재 데이터를 백업 내용으로 교체합니다. 기존 데이터를 먼저 백업해
-            주세요.
+            현재 데이터를 백업 내용으로 교체합니다. 노트북 앱에서는 복원 직전 데이터를 별도 파일로 자동 백업합니다.
           </p>
+          <p className="mt-3 text-sm text-amber-800">엑셀 자동 연결이 켜져 있으면 다음 동기화에서 원본 항목이 다시 갱신됩니다. 복원 상태를 확인하려면 엑셀 자동 연결을 잠시 중지하세요.</p>
           <p className="mt-3 text-sm text-slate-600">
             채용요청 {backup.requisitions.length}건 · 지원자{' '}
             {backup.candidates.length}명 · 면접 {backup.interviews.length}건 ·

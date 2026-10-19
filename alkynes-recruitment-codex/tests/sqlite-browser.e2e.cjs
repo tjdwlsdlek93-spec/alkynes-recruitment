@@ -176,7 +176,7 @@ test(
         .getByRole('button', { name: '엑셀 업데이트', exact: true })
         .click();
       await page
-        .getByText('엑셀 1행 반영 완료 · 자동 연결은 일시 중지 상태입니다.', {
+        .getByText(/엑셀 반영 완료.*신규 요청 1건.*자동 연결은 일시 중지 상태/, {
           exact: true,
         })
         .waitFor();
@@ -186,7 +186,7 @@ test(
         .getByRole('button', { name: '상세 / 수정', exact: true })
         .click();
       const dialog = page.getByRole('dialog');
-      await dialog.locator('input[name=owner]').fill('디스크 저장 검증');
+      await dialog.locator('textarea[name=notes]').fill('디스크 저장 검증');
       let fail = true;
       await page.route('**/__alkynes/data', (route) =>
         fail && route.request().method() === 'POST'
@@ -201,14 +201,14 @@ test(
         .getByRole('alert')
         .getByText('검증용 디스크 저장 실패', { exact: true })
         .waitFor();
-      assert.equal((await api()).data.requests[0].owner, '');
+      assert.equal((await api()).data.requests[0].appNotes, undefined);
       assert.equal(await dialog.count(), 1);
       fail = false;
       await dialog.getByRole('button', { name: '저장', exact: true }).click();
       await page
-        .getByText('담당자: 디스크 저장 검증', { exact: true })
+        .getByText('개인 메모: 디스크 저장 검증', { exact: true })
         .waitFor();
-      assert.equal((await api()).data.requests[0].owner, '디스크 저장 검증');
+      assert.equal((await api()).data.requests[0].appNotes, '디스크 저장 검증');
       // A slow poll from before a successful save must not rewind the visible data.
       const stale = await api();
       let held;
@@ -221,12 +221,12 @@ test(
       await page.route('**/__alkynes/data', delayedRead);
       await intercepted;
       await page.getByRole('button', { name: '상세 / 수정', exact: true }).click();
-      await page.locator('input[name=owner]').fill('최신 저장 유지 검증');
+      await page.locator('textarea[name=notes]').fill('최신 저장 유지 검증');
       await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
-      await page.getByText('담당자: 최신 저장 유지 검증', { exact: true }).waitFor();
+      await page.getByText('개인 메모: 최신 저장 유지 검증', { exact: true }).waitFor();
       await held.fulfill({ json: stale });
       await page.waitForTimeout(200);
-      assert.equal(await page.getByText('담당자: 최신 저장 유지 검증', { exact: true }).count(), 1);
+      assert.equal(await page.getByText('개인 메모: 최신 저장 유지 검증', { exact: true }).count(), 1);
       await page.unroute('**/__alkynes/data', delayedRead);
       const snapshot = await api(),
         person = snapshot.data.candidates[0];
@@ -275,23 +275,23 @@ test(
       await page
         .getByRole('button', { name: '상세 / 수정', exact: true })
         .click();
-      await page.locator('input[name=owner]').fill('5MB 초과 저장 검증');
+      await page.locator('textarea[name=notes]').fill('5MB 초과 저장 검증');
       await page
         .getByRole('dialog')
         .getByRole('button', { name: '저장', exact: true })
         .click();
       await page
-        .getByText('담당자: 5MB 초과 저장 검증', { exact: true })
+        .getByText('개인 메모: 5MB 초과 저장 검증', { exact: true })
         .waitFor();
-      assert.equal((await api()).data.requests[0].owner, '5MB 초과 저장 검증');
+      assert.equal((await api()).data.requests[0].appNotes, '5MB 초과 저장 검증');
       await page.goto(base + '/settings');
       const restore = (await api()).data;
-      restore.requests[0].owner = '대용량 백업 복원 검증';
+      restore.requests[0].appNotes = '대용량 백업 복원 검증';
       await page.locator('input[type=file]').setInputFiles({ name: 'large-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(restore)) });
       const restoreDialog = page.getByRole('dialog', { name: '백업 복원 확인', exact: true });
       await restoreDialog.getByRole('button', { name: '복원 확인', exact: true }).click();
       await restoreDialog.waitFor({ state: 'hidden' });
-      assert.equal((await api()).data.requests[0].owner, '대용량 백업 복원 검증');
+      assert.equal((await api()).data.requests[0].appNotes, '대용량 백업 복원 검증');
       await page.screenshot({
         path: '/workspace/scratch/sqlite-storage-settings.png',
         fullPage: true,

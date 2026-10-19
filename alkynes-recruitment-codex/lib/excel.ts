@@ -1,3 +1,4 @@
+import { excelChanges } from './excel-changes';
 import { candidateStatus, finalStatus } from './candidate-state';
 import type { CellValue } from 'exceljs';
 import type {
@@ -400,6 +401,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
       ...j,
       code: old?.code || prefix + String(++serial).padStart(3, '0'),
       headcount: old?.headcount || j.headcount,
+      reason: old?.reason || j.reason, duties: old?.duties || j.duties, requirements: old?.requirements || j.requirements, preferred: old?.preferred || j.preferred,
     };
   });
   upsert(data.requisitions, jobs, true);
@@ -414,6 +416,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
           resumeName: old.resumeName,
           resumeData: old.resumeData,
           career: old.career,
+          appNotes: old.appNotes,
         }
       : c;
   });
@@ -421,7 +424,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
   data.requests ||= [];
   upsert(data.requests, plan.requests.map(q => {
     const old = data.requests!.find(row => row.id === q.id);
-    return q.stage === '인적성 검사 요청' ? { ...q, examDeadline: old?.examDeadline || '', examStatus: old?.examStatus || (q.examAt ? '검사예정' as const : '미실시' as const) } : q;
+    return q.stage === '인적성 검사 요청' ? { ...q, appNotes: old?.appNotes, examDeadline: old?.examDeadline || '', examStatus: old?.examStatus || (q.examAt ? '검사예정' as const : '미실시' as const) } : { ...q, appNotes: old?.appNotes };
   }));
   upsert(
     data.interviews,
@@ -430,7 +433,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
       const location = plan.interviewFields?.location ? i.location : old?.location || i.location;
       const interviewers = plan.interviewFields?.interviewers ? i.interviewers : old?.interviewers || i.interviewers;
       const pastInterviewers = [...new Set([...(old?.pastInterviewers || []), ...data.evaluations.filter(e => e.interviewId === i.id).map(e => e.evaluator)])].filter(name => !interviewers.includes(name));
-      return { ...i, location, interviewers, ...(pastInterviewers.length ? { pastInterviewers } : {}) };
+      return { ...i, durationMinutes: old?.durationMinutes, appNotes: old?.appNotes, location, interviewers, ...(pastInterviewers.length ? { pastInterviewers } : {}) };
     }),
   );
 }
@@ -450,6 +453,7 @@ export function excludedSummary(q: ProcessRequest, data: RecruitmentData) {
 
 // Automatic mode follows one connected workbook; manually created records remain independent.
 export function applyExcelSnapshot(data: RecruitmentData, plan: ExcelPlan) {
+  const before = structuredClone(data);
   const jobs = new Set(plan.jobs.map((j) => j.id)),
     people = new Set(plan.candidates.map((c) => c.id)),
     requests = new Set(plan.requests.map((q) => q.id)),
@@ -474,4 +478,6 @@ export function applyExcelSnapshot(data: RecruitmentData, plan: ExcelPlan) {
   applyExcelPlan(data, plan);
   for (const j of data.requisitions) if (jobs.has(j.id)) j.excelMissing = false;
   for (const c of data.candidates) if (people.has(c.id)) c.excelMissing = false;
+  const run = excelChanges(before, data, plan.sourceName);
+  if (run.changes.length || !data.excelRuns?.length) data.excelRuns = [run, ...(data.excelRuns || [])].slice(0, 30);
 }

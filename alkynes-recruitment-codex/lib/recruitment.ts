@@ -64,6 +64,7 @@ export type Candidate = Stamped & {
   email: string;
   status: (typeof candidateStatuses)[number];
   notes: string;
+  appNotes?: string;
   resumeName: string;
   resumeData: string;
 };
@@ -73,6 +74,8 @@ export type Interview = Stamped & {
   location: string;
   interviewers: string[];
   pastInterviewers?: string[];
+  durationMinutes?: number;
+  appNotes?: string;
   source?: string;
   verification?: string;
   status: '면접예정' | '면접완료' | '취소' | '확인 필요';
@@ -103,6 +106,7 @@ export type ProcessRequest = Stamped & {
   completedAt: string;
   source?: string;
   sourceRow?: number;
+  appNotes?: string;
   examAt?: string;
   examDeadline?: string;
   examStatus?: '미실시' | '검사예정' | '실시완료';
@@ -117,6 +121,23 @@ export type Activity = {
   actor: string;
   message: string;
 };
+export type SharedNotice = {
+  id: string;
+  kind: 'interview' | 'aptitude';
+  targetId: string;
+  candidateId: string;
+  audience: 'internal' | 'candidate';
+  signature: string;
+  at: string;
+};
+export type ExcelChange = { entity: string; candidateId: string; label: string; detail: string };
+export type ExcelRun = {
+  id: string;
+  at: string;
+  sourceName: string;
+  counts: Record<string, number>;
+  changes: ExcelChange[];
+};
 export type RecruitmentData = {
   version: 1;
   requisitions: Requisition[];
@@ -125,6 +146,8 @@ export type RecruitmentData = {
   evaluations: Evaluation[];
   activity: Activity[];
   requests?: ProcessRequest[];
+  sharedNotices?: SharedNotice[];
+  excelRuns?: ExcelRun[];
 };
 export const storageKey = 'alkynes.recruitment.v1';
 export function newStamp(): Stamped {
@@ -300,7 +323,7 @@ export function calendarFile(i: Interview, c: Candidate) {
       .replace(/,/g, '\\,')
       .replace(/;/g, '\\;');
   const start = new Date(i.startsAt),
-    end = new Date(start.getTime() + 3600000);
+    end = new Date(start.getTime() + (i.durationMinutes || 60) * 60000);
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -464,6 +487,7 @@ export function validateData(value: unknown): value is RecruitmentData {
           'excelFinal',
           'expectedJoin',
           'actualJoin',
+          'appNotes',
         ]) &&
         [c.expectedJoin, c.actualJoin].every(
           (v) => !v || Number.isFinite(Date.parse(v)),
@@ -474,7 +498,7 @@ export function validateData(value: unknown): value is RecruitmentData {
               (v) => typeof v === 'string' && Number.isFinite(Date.parse(v)),
             ))),
     ) ||
-    !d.interviews.every((i) => optionalStrings(i, ['source', 'verification']))
+    !d.interviews.every((i) => optionalStrings(i, ['source', 'verification', 'appNotes']) && (i.durationMinutes === undefined || (Number.isInteger(i.durationMinutes) && i.durationMinutes >= 5 && i.durationMinutes <= 480)))
   )
     return false;
   if (
@@ -484,7 +508,7 @@ export function validateData(value: unknown): value is RecruitmentData {
       !d.requests.every(
         (q) =>
           stamp(q) &&
-          optionalStrings(q, ['source', 'verification', 'examAt', 'examDeadline']) &&
+          optionalStrings(q, ['source', 'verification', 'examAt', 'examDeadline', 'appNotes']) &&
           (!q.examAt || Number.isFinite(Date.parse(q.examAt))) &&
           (!q.examDeadline || Number.isFinite(Date.parse(q.examDeadline))) &&
           (q.examStatus === undefined || ['미실시', '검사예정', '실시완료'].includes(q.examStatus)) &&
@@ -530,6 +554,15 @@ export function validateData(value: unknown): value is RecruitmentData {
       .size !== d.evaluations.length
   )
     return false;
+  if (d.sharedNotices !== undefined && (!Array.isArray(d.sharedNotices) || !unique(d.sharedNotices) ||
+    !d.sharedNotices.every(n => n && str(n, ['id', 'kind', 'targetId', 'candidateId', 'audience', 'signature', 'at']) &&
+      ['interview', 'aptitude'].includes(n.kind) && ['internal', 'candidate'].includes(n.audience) &&
+      (n.kind !== 'aptitude' || n.audience === 'internal') && !!n.targetId && !!n.signature && Number.isFinite(Date.parse(n.at))) ||
+    new Set(d.sharedNotices.map(n => n.kind + '|' + n.targetId + '|' + n.audience)).size !== d.sharedNotices.length)) return false;
+  if (d.excelRuns !== undefined && (!Array.isArray(d.excelRuns) || !unique(d.excelRuns) ||
+    !d.excelRuns.every(run => run && str(run, ['id', 'at', 'sourceName']) && Number.isFinite(Date.parse(run.at)) &&
+      run.counts && typeof run.counts === 'object' && !Array.isArray(run.counts) && Object.values(run.counts).every(n => Number.isSafeInteger(n) && n >= 0) &&
+      Array.isArray(run.changes) && run.changes.every(change => change && str(change, ['entity', 'candidateId', 'label', 'detail']))))) return false;
   return (
     [d.requisitions, d.candidates, d.interviews, d.evaluations].every(unique) &&
     d.activity.every(
