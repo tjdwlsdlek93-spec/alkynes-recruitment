@@ -13,6 +13,7 @@ export default function Page() {
   const { data, commit } = useRecruitment();
   const [editing, setEditing] = useState<Candidate | null | undefined>(),
     [query, setQuery] = useState(''),
+    [historyId, setHistoryId] = useState(''),
     [req, setReq] = useState(''),
     [status, setStatus] = useState(''),
     [group, setGroup] = useState('active'),
@@ -106,10 +107,12 @@ export default function Page() {
       (group === 'all' || (group === 'ended' ? endedCandidate(c) : group === 'closed' ? closedJob(data.requisitions.find(r => r.id === c.requisitionId)!) : !closedJob(data.requisitions.find(r => r.id === c.requisitionId)!) && !endedCandidate(c))) &&
       (status === '__archived' ? !!c.excelMissing : !c.excelMissing) &&
       (!status || status === '__archived' || candidateStatus(c) === status) &&
-      (c.name + c.source + c.career)
+      (c.name + ' ' + c.source + ' ' + c.career + ' ' + [data.requisitions.find(r => r.id === c.requisitionId)?.role, data.requisitions.find(r => r.id === c.requisitionId)?.department, data.requisitions.find(r => r.id === c.requisitionId)?.code].join(' '))
         .toLowerCase()
         .includes(query.toLowerCase()),
   ).sort((a, b) => latestRequest(data, b.requisitionId, b.id).localeCompare(latestRequest(data, a.requisitionId, a.id)));
+  const historyPerson = data.candidates.find(c => c.id === historyId);
+  const historyJob = data.requisitions.find(r => r.id === historyPerson?.requisitionId);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -133,7 +136,7 @@ export default function Page() {
         <input
           className="field max-w-xs"
           aria-label="지원자 검색"
-          placeholder="이름, 경력, 지원경로 검색"
+          placeholder="이름, 공고명, 부서, 경력 검색"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -169,7 +172,7 @@ export default function Page() {
             <tr>
               {[
                 '지원자',
-                '채용번호',
+                '지원 공고',
                 '지원경로',
                 '경력',
                 '진행 상태',
@@ -182,14 +185,14 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => (
+            {rows.map((c) => {
+              const job = data.requisitions.find(r => r.id === c.requisitionId);
+              return (
               <tr className="border-t" key={c.id}>
                 <td className="px-5 py-4 font-semibold">{c.name}</td>
-                <td className="px-5 py-4">
-                  {
-                    data.requisitions.find((r) => r.id === c.requisitionId)
-                      ?.code
-                  }
+                <td className="min-w-[220px] max-w-sm whitespace-normal px-5 py-4">
+                  <p className="break-keep font-bold">{job?.role || '공고 정보 없음'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{job?.department || '부서 미입력'} · {job?.code || '—'}</p>
                 </td>
                 <td className="px-5 py-4">{c.source || '—'}</td>
                 <td className="px-5 py-4">{c.career || '—'}</td>
@@ -197,13 +200,14 @@ export default function Page() {
                   <CandidateStatusBadge status={candidateStatus(c)} />
                 </td>
                 <td className="px-5 py-4">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       className="btn-secondary"
                       onClick={() => setEditing(c)}
                     >
                       상세 / 수정
                     </button>
+                    <button className="btn-secondary" onClick={() => setHistoryId(c.id)}>진행 이력</button>
                     <Link
                       className="btn-secondary"
                       href={'/interviews?candidate=' + c.id}
@@ -213,11 +217,17 @@ export default function Page() {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         {!rows.length && <Empty>조건에 맞는 지원자가 없습니다.</Empty>}
       </div>
+      {historyPerson && <Modal title={historyPerson.name + ' · 지원자 진행 이력'} onClose={() => setHistoryId('')}>
+        <p className="font-bold">{historyJob?.role || '공고 정보 없음'}</p>
+        <p className="mt-1 text-sm text-slate-500">{historyJob?.department} · {historyJob?.code}</p>
+        <CandidateTimeline candidateId={historyPerson.id} expanded />
+      </Modal>}
       {editing !== undefined && (
         <Modal
           title={editing ? '지원자 상세 / 수정' : '지원자 등록'}

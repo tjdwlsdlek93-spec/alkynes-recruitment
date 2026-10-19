@@ -69,7 +69,14 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     assert.equal(await history.locator('article').count(),1);
     await history.getByLabel('엑셀 수정 내용 검색',{exact:true}).fill('');
     await page.screenshot({path:'/workspace/scratch/excel-daily-history.png',fullPage:true});
-    await page.goto(base+'/candidates');const personRow=page.getByRole('row').filter({hasText:'검증갑'});await personRow.getByRole('button',{name:'상세 / 수정',exact:true}).click();dialog=page.getByRole('dialog');
+    await page.goto(base+'/candidates');const personRow=page.getByRole('row').filter({hasText:'검증갑'});
+    await personRow.getByText('업무검증채용',{exact:true}).waitFor();await personRow.getByText(/검증부서 · HR-/).waitFor();
+    await page.getByLabel('지원자 검색',{exact:true}).fill('업무검증채용');assert.equal(await page.getByRole('button',{name:'진행 이력',exact:true}).count(),2);await page.getByLabel('지원자 검색',{exact:true}).fill('');
+    await personRow.getByRole('button',{name:'진행 이력',exact:true}).click();
+    const historyDialog=page.getByRole('dialog',{name:'검증갑 · 지원자 진행 이력',exact:true});
+    await historyDialog.getByText('업무검증채용',{exact:true}).waitFor();assert.equal(await historyDialog.locator('details').evaluate(el=>el.open),true);
+    await historyDialog.getByText('엑셀 반영 · 면접 변경',{exact:true}).waitFor();await historyDialog.getByRole('button',{name:'닫기',exact:true}).click();
+    await personRow.getByRole('button',{name:'상세 / 수정',exact:true}).click();dialog=page.getByRole('dialog');
     assert.equal(await dialog.locator('input[name=name]').isDisabled(),true);await dialog.getByText(/지원자 진행 이력 ·/).click();await dialog.getByText('엑셀 반영 · 면접 변경',{exact:true}).waitFor();
     await dialog.locator('textarea[name=notes]').fill('유지할 지원자 메모');await dialog.getByRole('button',{name:'저장',exact:true}).click();await page.getByRole('dialog').waitFor({state:'detached'});
     await page.goto(base+'/aptitudes');await page.getByRole('button',{name:'상세 / 수정',exact:true}).click();dialog=page.getByRole('dialog');
