@@ -65,16 +65,19 @@ export default function Dashboard() {
       <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside"><TodayWork />
       <div className="card week-note p-5">
         <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접</h2>
-        {thisWeek.map((i) => (
-          <Link
-            className="block rounded-xl border p-3 mb-2 text-sm"
+        {thisWeek.map((i) => {
+          const person = data.candidates.find(c => c.id === i.candidateId);
+          const job = data.requisitions.find(r => r.id === person?.requisitionId);
+          return <Link
+            className="mb-2 block space-y-2 rounded-xl border p-3 text-sm"
             key={i.id}
             href={'/evaluations?interview=' + i.id}
           >
-            {data.candidates.find((c) => c.id === i.candidateId)?.name} ·{' '}
-            {formatDate(i.startsAt)} · {i.location}
-          </Link>
-        ))}
+            <p className="break-keep font-bold leading-6">{job?.role || '공고 미지정'} <span className="inline-block whitespace-nowrap">· {person?.name || '지원자 미지정'}</span></p>
+            <p className="text-xs leading-5 text-slate-600">{formatDate(i.startsAt)}</p>
+            <p className="break-keep text-xs leading-5 text-slate-600">{i.location || '장소 미입력'}</p>
+          </Link>;
+        })}
         {!thisWeek.length && <Empty>이번 주 예정된 면접이 없습니다.</Empty>}
       </div>
         <div className="card desk-note p-5"><span className="board-eyebrow">BOARD MEMO</span><h2 className="mt-3 font-bold">이렇게 확인하세요</h2><ul className="mt-4 space-y-3 text-xs leading-6 text-slate-600"><li>· 엑셀 저장 후 좌측의 <strong>엑셀 업데이트</strong>를 누르면 바로 반영됩니다.</li><li>· 입사포기·지원포기 등 종료된 전형은 진행중 집계에서 제외합니다.</li><li>· 인적성·면접 화면에서 카톡 안내문을 작성하고 복사할 수 있습니다.</li></ul></div>
