@@ -116,6 +116,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       }));
   }
   async function poll(force = false) {
+    if (storeRef.current.readOnly) return { ok: false, message: '노트북에서 엑셀을 반영해 주세요.' };
     if (busy.current || pendingRef.current) return { ok: false, message: '엑셀 확인 작업이 진행 중입니다. 잠시 후 다시 눌러 주세요.' };
     if (!connection.current.path) return { ok: false, message: '엑셀 연동에서 파일 경로를 먼저 연결해 주세요.' };
     if (!force && !connection.current.enabled) return { ok: false, message: '자동 연결이 일시 중지되어 있습니다.' };
@@ -187,6 +188,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
   const pollRef = useRef(poll);
   pollRef.current = poll;
   useEffect(() => {
+    if (store.readOnly) return;
     mounted.current = true;
     let initialized = false;
     async function initialize() {
@@ -236,7 +238,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', visible);
     };
-  }, []);
+  }, [store.readOnly]);
   async function preview(input: string) {
     if (busy.current) return;
     const path = input.trim().replace(/^"(.*)"$/, '$1');

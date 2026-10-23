@@ -1,4 +1,4 @@
-import { formatDate } from './recruitment';
+import { formatDate, formatDateOnly } from './recruitment';
 import type { RecruitmentData, Interview, ProcessRequest } from './recruitment';
 export type Audience = 'internal' | 'candidate';
 const date = (value: string | undefined) => value ? formatDate(value) : '[입력해 주세요]';
@@ -19,4 +19,17 @@ export function sampleMessage(kind: '인적성' | '면접', audience: Audience) 
   const notice = '[안내문 예시 · 실제 요청이나 일정이 아닙니다]\n';
   if (kind === '인적성') return notice + '안녕하세요!\n[공고명] / [지원자명] 인적성 검사 요청 완료했습니다.\n응시기한: [일자 및 시간]';
   return notice + interviewMessage({ requisitions: [], candidates: [] } as unknown as RecruitmentData, { status: '면접예정', startsAt: '' } as Interview, audience).replace('지원자님', '[지원자명]님');
+}
+
+export function acceptanceMessage(name: string, role: string, startsOn: string, documents: string) {
+  return `안녕하세요, 알킨스 경영지원팀 민성진 과장입니다.
+${name}님, ${role} 최종 합격을 축하드립니다!
+
+출근일: ${startsOn ? formatDateOnly(startsOn) : '[날짜 입력]'} 오전 08시 30분
+장소: (주) 알킨스 사무동 2층(면접 본 건물)
+제출서류:
+${documents.trim() || '[제출서류 입력]'}
+
+문의사항 있으시면 연락 부탁드립니다.
+감사합니다.`;
 }

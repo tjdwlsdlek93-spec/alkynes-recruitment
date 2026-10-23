@@ -4,16 +4,18 @@ import Link from 'next/link';
 import { koreaDate } from '@/lib/scheduling';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Modal, Field, Actions, Empty, value } from '@/components/Forms';
+import { AcceptanceMessage } from '@/components/AcceptanceMessage';
 import { CandidateTimeline } from '@/components/CandidateTimeline';
 import { CandidateStatusBadge } from '@/components/CandidateStatusBadge';
 import { candidateStatuses, formatDateOnly, newStamp, type Candidate } from '@/lib/recruitment';
 import { candidateStatus, endedCandidate, finalStatus } from '@/lib/candidate-state';
 import { closedJob, latestRequest } from '@/lib/recruitment-view';
 export default function Page() {
-  const { data, commit } = useRecruitment();
+  const { data, commit, readOnly } = useRecruitment();
   const [editing, setEditing] = useState<Candidate | null | undefined>(),
     [query, setQuery] = useState(''),
     [historyId, setHistoryId] = useState(''),
+    [acceptanceId, setAcceptanceId] = useState(''),
     [req, setReq] = useState(''),
     [status, setStatus] = useState(''),
     [group, setGroup] = useState('active'),
@@ -111,6 +113,7 @@ export default function Page() {
         .toLowerCase()
         .includes(query.toLowerCase()),
   ).sort((a, b) => latestRequest(data, b.requisitionId, b.id).localeCompare(latestRequest(data, a.requisitionId, a.id)));
+  const acceptedPerson = data.candidates.find(c => c.id === acceptanceId && !c.excelMissing && ['최종합격', '입사확정'].includes(candidateStatus(c)));
   const historyPerson = data.candidates.find(c => c.id === historyId);
   const historyJob = data.requisitions.find(r => r.id === historyPerson?.requisitionId);
   return (
@@ -124,7 +127,7 @@ export default function Page() {
         </div>
         <button
           className="btn-primary"
-          disabled={!data.requisitions.length}
+          disabled={readOnly || !data.requisitions.length}
           onClick={() => setEditing(null)}
         >
           + 지원자 등록
@@ -208,6 +211,7 @@ export default function Page() {
                       상세 / 수정
                     </button>
                     <button className="btn-secondary" onClick={() => setHistoryId(c.id)}>진행 이력</button>
+                    {!c.excelMissing && ['최종합격', '입사확정'].includes(candidateStatus(c)) && <button className="btn-primary" onClick={() => setAcceptanceId(c.id)}>합격 안내문</button>}
                     <Link
                       className="btn-secondary"
                       href={'/interviews?candidate=' + c.id}
@@ -223,6 +227,7 @@ export default function Page() {
         </table>
         {!rows.length && <Empty>조건에 맞는 지원자가 없습니다.</Empty>}
       </div>
+      {acceptedPerson && <AcceptanceMessage key={acceptedPerson.id} person={acceptedPerson} role={data.requisitions.find(r => r.id === acceptedPerson.requisitionId)?.role || '채용'} onClose={() => setAcceptanceId('')} />}
       {historyPerson && <Modal title={historyPerson.name + ' · 지원자 진행 이력'} onClose={() => setHistoryId('')}>
         <p className="font-bold">{historyJob?.role || '공고 정보 없음'}</p>
         <p className="mt-1 text-sm text-slate-500">{historyJob?.department} · {historyJob?.code}</p>
@@ -250,7 +255,7 @@ export default function Page() {
           {editing?.excelStage !== undefined && <p className="mb-4 text-sm text-slate-500">이름·채용건·진행상태는 엑셀에서 수정합니다. 연락처·이력서·개인 메모는 앱에만 저장합니다.</p>}
           <form onSubmit={save}>
             <fieldset
-              disabled={busy}
+              disabled={busy || readOnly}
               className="grid grid-cols-1 gap-4 sm:grid-cols-2"
             >
               <Field label="채용건 *">

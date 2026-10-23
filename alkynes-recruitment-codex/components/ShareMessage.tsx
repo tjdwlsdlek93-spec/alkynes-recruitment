@@ -5,7 +5,7 @@ import { useRecruitment } from './RecruitmentProvider';
 import { interviewRoom, type Audience } from '@/lib/messages';
 import { markNotice, noticeSignature, noticeState, type NoticeTarget } from '@/lib/workspace';
 export function ShareMessage({ title, generate, onClose, internalOnly = false, target }: { title: string; internalOnly?: boolean; generate: (audience: Audience) => string; onClose: () => void; target?: NoticeTarget }) {
-  const { data, commit, saving } = useRecruitment();
+  const { data, commit, saving, readOnly } = useRecruitment();
   const [audience, setAudience] = useState<Audience>('internal'), [text, setText] = useState(() => generate('internal')), [message, setMessage] = useState('');
   const [signature, setSignature] = useState(() => target ? noticeSignature(data, target) : '');
   const state = target ? noticeState(data, target, audience) : undefined;
@@ -30,6 +30,6 @@ export function ShareMessage({ title, generate, onClose, internalOnly = false, t
     {target && <p className="mt-3 text-sm font-semibold">{state?.current ? '안내 완료' : state?.saved ? '일정 변경 · 재안내 필요' : '미안내'}</p>}
     {stale && <p role="alert" className="mt-3 text-sm text-amber-800">작성 중 원본 정보가 바뀌었습니다. <button className="underline" onClick={() => regenerate()}>최신 안내문 다시 작성</button></p>}
     {message && <p role="status" className="mt-3 text-sm text-teal-700">{message}</p>}
-    <div className="mt-4 flex flex-wrap justify-end gap-2"><button className="btn-secondary" onClick={onClose}>닫기</button><button className="btn-primary" disabled={!text.trim() || stale} onClick={() => void copy()}>카톡 메시지 복사</button>{target && <button className="btn-secondary" disabled={saving || stale} onClick={() => void mark()}>{state?.current ? '미안내로 변경' : '안내 완료로 표시'}</button>}</div>
+    <div className="mt-4 flex flex-wrap justify-end gap-2"><button className="btn-secondary" onClick={onClose}>닫기</button><button className="btn-primary" disabled={!text.trim() || stale} onClick={() => void copy()}>카톡 메시지 복사</button>{target && !readOnly && <button className="btn-secondary" disabled={saving || stale} onClick={() => void mark()}>{state?.current ? '미안내로 변경' : '안내 완료로 표시'}</button>}</div>
   </Modal>;
 }

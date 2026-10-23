@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatDate } from '@/lib/recruitment';
 import { Download, RefreshCw } from 'lucide-react';
+import { useRecruitment } from './RecruitmentProvider';
 import { useExcelSync } from './ExcelSync';
 import { updateApi, waitForAppRestart } from './AppUpdate';
 export function SidebarUpdateActions() {
+  const { readOnly } = useRecruitment();
   const sync = useExcelSync();
   const [target, setTarget] = useState<HTMLElement | null>(null), [busy, setBusy] = useState<'app' | 'excel' | ''>(''), [message, setMessage] = useState(''), [error, setError] = useState(false);
   const locked = useRef(false);
@@ -27,7 +29,7 @@ export function SidebarUpdateActions() {
     } catch (e) { setError(true); setMessage(e instanceof Error ? e.message : '업데이트에 실패했습니다.'); }
     finally { locked.current = false; setBusy(''); }
   }
-  if (!target) return null;
+  if (!target || readOnly) return null;
   return createPortal(<div className="space-y-2" aria-label="빠른 업데이트">
     <button className="btn-secondary w-full gap-2 border-teal-200 text-teal-900" disabled={!!busy} onClick={() => void run('app')}>{busy === 'app' ? <RefreshCw size={15} className="animate-spin"/> : <Download size={15}/>} {busy === 'app' ? '앱 업데이트 중…' : '앱 업데이트'}</button>
     <button className="btn-secondary w-full gap-2 border-teal-200 text-teal-900" disabled={!!busy || sync.working || sync.status.available === null} onClick={() => void run('excel')}><RefreshCw size={15} className={busy === 'excel' ? 'animate-spin' : ''}/>{busy === 'excel' ? '엑셀 반영 중…' : '엑셀 업데이트'}</button>

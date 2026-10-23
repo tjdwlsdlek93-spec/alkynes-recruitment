@@ -255,6 +255,126 @@ function createDataHandler({ port, dataDir, validate }) {
   };
   return handler;
 }
+// A separate read-only listener binds exclusively to a local Tailscale IPv4.
+// Kept in server.cjs so older installed update workers copy this feature too.
+function isTailnetIPv4(value) {
+  if (require('node:net').isIP(value) !== 4) return false;
+  const octets = value.split('.').map(Number);
+  return octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127;
+}
+function mobileAddresses() {
+  return [...new Set(Object.values(require('node:os').networkInterfaces()).flat()
+    .filter(row => row && !row.internal && isTailnetIPv4(row.address)).map(row => row.address))];
+}
+function createMobileHandler({ host, localPort, passwordHash, salt }) {
+  const http = require('node:http'), crypto = require('node:crypto');
+  const secret = crypto.randomBytes(32), attempts = new Map();
+  const signature = value => crypto.createHmac('sha256', secret).update(value).digest('hex');
+  const equal = (a,b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
+  const login = '<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>채용관리 · 개인 접속</title><style>body{font-family:system-ui;background:#f7f3e7;margin:0;padding:24px}main{max-width:360px;margin:12vh auto;padding:24px;border:1px solid #333;border-radius:16px;background:#fffdf5;box-shadow:4px 5px #333}input,button{box-sizing:border-box;width:100%;padding:14px;margin-top:12px;border:1px solid #888;border-radius:8px}button{background:#ffe56b;font-weight:bold}</style><main><h1>나만의 채용 보드</h1><p>노트북에서 설정한 접속 비밀번호를 입력하세요.</p><form method="post" action="/__alkynes/mobile/login"><label>접속 비밀번호<input name="password" type="password" required maxlength="200" autocomplete="current-password"></label><button>조회 시작</button></form><p>개인 VPN 연결 · 읽기 전용</p></main></html>';
+  function send(res,code,body,type='text/plain; charset=utf-8',headers={}) {
+    res.writeHead(code,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin',...headers});res.end(body);
+  }
+  return async function mobile(req,res) {
+    const peer = (req.socket.remoteAddress || '').replace(/^::ffff:/,'');
+    if (!isTailnetIPv4(peer) || req.headers.host !== host) return send(res,403,'개인 VPN에서만 접속할 수 있습니다.');
+    let name;
+    try { name = decodeURIComponent(new URL(req.url,'http://'+host).pathname); }
+    catch { return send(res,400,'잘못된 주소입니다.'); }
+    const origin = 'http://' + host;
+    if (name === '/__alkynes/mobile/login' && req.method === 'POST') {
+      if (req.headers.origin !== origin) return send(res,403,'접속 출처를 확인해 주세요.');
+      const now = Date.now();
+      for (const [key,value] of attempts) if (now - value.at > 600000) attempts.delete(key);
+      const entry = attempts.get(peer) || {count:0,at:now};
+      if (entry.count >= 5 || attempts.size >= 100) return send(res,429,'로그인 시도가 많습니다. 10분 뒤 다시 시도하세요.');
+      entry.count++;attempts.set(peer,entry);
+      try {
+        let size=0; const chunks=[];
+        for await (const chunk of req) { size+=chunk.length;if(size>4096)return send(res,413,'입력 길이를 확인하세요.');chunks.push(chunk); }
+        const password = new URLSearchParams(Buffer.concat(chunks).toString()).get('password') || '';
+        if (password.length>200 || !equal(crypto.scryptSync(password,salt,32).toString('hex'),passwordHash)) return send(res,401,'비밀번호가 맞지 않습니다. 뒤로 돌아가 다시 입력하세요.');
+        attempts.delete(peer);
+        const value = String(now);
+        return send(res,303,'','text/plain',{'Location':'/dashboard','Set-Cookie':'alkynes_mobile='+value+'.'+signature(value)+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800'});
+      } catch { return send(res,400,'로그인 요청을 확인해 주세요.'); }
+    }
+    const token = /(?:^|;\s*)alkynes_mobile=([0-9]+)\.([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '');
+    const authenticated = token && Number(token[1]) <= Date.now() && Date.now()-Number(token[1])<28800000 && equal(token[2],signature(token[1]));
+    if (!authenticated) {
+      if (name.startsWith('/__alkynes/')) return send(res,401,'로그인이 필요합니다.');
+      return send(res,200,login,'text/html; charset=utf-8');
+    }
+    if (name === '/__alkynes/mobile/logout' && req.method === 'POST' && req.headers.origin === origin)
+      return send(res,303,'','text/plain',{'Location':'/','Set-Cookie':'alkynes_mobile=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'});
+    if (!['GET','HEAD'].includes(req.method)) return send(res,403,'휴대폰에서는 조회만 가능합니다.');
+    if (name === '/__alkynes/source') return send(res,200,JSON.stringify({path:'',enabled:false}),'application/json');
+    const data = name === '/__alkynes/data';
+    const pages = ['/', '/dashboard','/candidates','/requisitions','/aptitudes','/interviews','/evaluations'];
+    const allowed = data || name === '/__alkynes/health' || pages.some(p => name === p || (p!=='/' && name === p+'.txt')) || name.startsWith('/_next/static/') || /^\/(fonts|images)\//.test(name) || name === '/favicon.ico';
+    if (!allowed || name.includes('..') || name.includes('\\') || name.includes('\0')) return send(res,403,'휴대폰 조회에서 사용할 수 없는 기능입니다.');
+    const upstream = http.request({hostname:'127.0.0.1',port:localPort,path:req.url,method:'GET',headers:{Host:'127.0.0.1:'+localPort,'X-Alkynes-Client':'1',...(req.headers.rsc==='1'?{RSC:'1'}:{})},timeout:15000}, response => {
+      if (data) {
+        const chunks=[];response.on('data',c=>chunks.push(c));response.on('end',()=>{
+          try {
+            const body = JSON.parse(Buffer.concat(chunks));
+            if(response.statusCode!==200 || body.storage!=='sqlite') return send(res,503,'노트북 데이터를 읽지 못했습니다.');
+            send(res,200,JSON.stringify({data:body.data,revision:body.revision,updatedAt:body.updatedAt,storage:'sqlite',readOnly:true,databasePath:''}),'application/json');
+          } catch { send(res,503,'노트북 데이터를 읽지 못했습니다.'); }
+        });
+      } else {
+        res.writeHead(response.statusCode || 502,{'Content-Type':response.headers['content-type'] || 'text/plain','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY',...(response.headers.location?{Location:response.headers.location}:{})});
+        if(req.method==='HEAD'){response.resume();res.end();}else response.pipe(res);
+      }
+    });
+    upstream.on('timeout',()=>upstream.destroy());
+    upstream.on('error',()=>{if(!res.headersSent)send(res,503,'노트북 앱 연결을 확인해 주세요.');else res.destroy();});
+    res.on('close',()=>upstream.destroy());upstream.end();
+  };
+}
+function createMobileAccess({port,dataDir}) {
+  const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto');
+  const configFile=path.join(dataDir,'mobile-access.json'),mobilePort=port+1;
+  let config={enabled:false},listener=null,error='',starting=false;
+  try{config=JSON.parse(fs.readFileSync(configFile,'utf8'));}catch{}
+  const status=()=>({enabled:config.enabled===true,connected:!!listener?.listening,address:config.address || '',port:mobilePort,addresses:mobileAddresses(),url:listener?.listening?'http://'+config.address+':'+mobilePort:'',error});
+  function start() {
+    if(!config.enabled || listener || starting)return;
+    if(!isTailnetIPv4(config.address) || !mobileAddresses().includes(config.address)) {error='Tailscale 연결을 확인하세요. 연결되면 자동으로 다시 시도합니다.';return;}
+    if(!/^[a-f0-9]{64}$/.test(config.passwordHash || '') || !/^[a-f0-9]{32}$/.test(config.salt || '')) {error='접속 비밀번호를 다시 설정해 주세요.';return;}
+    starting=true;
+    const instance=http.createServer(createMobileHandler({host:config.address+':'+mobilePort,localPort:port,passwordHash:config.passwordHash,salt:config.salt}));
+    listener=instance;
+    instance.requestTimeout=20000;instance.headersTimeout=10000;
+    instance.on('error',()=>{if(listener===instance)listener=null;starting=false;error='휴대폰 접속 포트를 열지 못했습니다. VPN과 포트 사용 여부를 확인하세요.';});
+    instance.listen(mobilePort,config.address,()=>{starting=false;error='';});
+  }
+  function stop(){const old=listener;listener=null;starting=false;if(old){old.close();old.closeAllConnections();}}
+  const timer=setInterval(start,30000);timer.unref();start();
+  async function handle(req,res) {
+    const send=(code,body)=>{res.writeHead(code,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
+    const peer=(req.socket.remoteAddress || '').replace(/^::ffff:/,'');
+    const hosts=['127.0.0.1:'+port,'localhost:'+port];
+    if(!['127.0.0.1','::1'].includes(peer) || !hosts.includes(req.headers.host) || req.headers['x-alkynes-client']!=='1' || (req.headers.origin && !hosts.map(h=>'http://'+h).includes(req.headers.origin))) return send(403,{error:'노트북 앱에서만 설정할 수 있습니다.'});
+    if(req.method==='GET')return send(200,status());
+    if(req.method!=='POST')return send(405,{error:'허용되지 않은 요청입니다.'});
+    try {
+      let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>4096)return send(413,{error:'입력 길이를 확인하세요.'});chunks.push(chunk);}
+      const body=JSON.parse(Buffer.concat(chunks));
+      let next={...config,enabled:body.enabled===true};
+      if(next.enabled){
+        if(!isTailnetIPv4(body.address) || !mobileAddresses().includes(body.address))return send(400,{error:'이 노트북의 연결된 Tailscale IPv4를 선택해 주세요.'});
+        next.address=body.address;
+        if(body.password){if(typeof body.password!=='string' || body.password.length<12 || body.password.length>200)return send(400,{error:'비밀번호는 12~200자로 설정해 주세요.'});next.salt=crypto.randomBytes(16).toString('hex');next.passwordHash=crypto.scryptSync(body.password,next.salt,32).toString('hex');}
+        if(!next.passwordHash)return send(400,{error:'최초 연결 시 접속 비밀번호가 필요합니다.'});
+      }
+      fs.mkdirSync(dataDir,{recursive:true});const temp=configFile+'.tmp';fs.writeFileSync(temp,JSON.stringify(next),{mode:0o600});fs.renameSync(temp,configFile);
+      stop();config=next;error='';start();return send(200,status());
+    }catch{return send(400,{error:'접속 설정을 저장하지 못했습니다.'});}
+  }
+  handle.close=()=>{clearInterval(timer);stop();};return handle;
+}
+
 function startServer() {
   const http = require('node:http');
   const fs = require('node:fs');
@@ -284,6 +404,7 @@ function startServer() {
     validate: (value) =>
       require(path.join(root, '_server/recruitment.cjs')).validateData(value),
   });
+  const handleMobile = createMobileAccess({ port, dataDir: process.env.ALKYNES_DATA_DIR || path.join(__dirname, 'config') });
   const stopFile = path.join(__dirname, '.stop-request');
   const types = {
     '.html': 'text/html; charset=utf-8',
@@ -311,6 +432,7 @@ function startServer() {
     } catch {
       return reply(res, 400, 'Bad request');
     }
+    if (name === '/__alkynes/mobile') { void handleMobile(req, res); return; }
     if (name.startsWith('/__alkynes/data')) {
       void handleData(req, res, name);
       return;
@@ -370,7 +492,7 @@ function startServer() {
       reply(res, 404, 'Not found');
     }
   });
-  server.on('close', () => handleData.close());
+  server.on('close', () => { handleMobile.close(); handleData.close(); });
   server.on('error', (error) => {
     console.error('채용관리 서버를 시작하지 못했습니다:', error.message);
     process.exitCode = 1;
@@ -388,4 +510,4 @@ function startServer() {
   });
 }
 if (require.main === module) startServer();
-module.exports = { createDataHandler };
+module.exports = { createDataHandler, createMobileHandler, createMobileAccess, isTailnetIPv4 };

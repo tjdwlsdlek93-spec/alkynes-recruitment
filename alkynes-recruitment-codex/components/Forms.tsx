@@ -85,13 +85,13 @@ export function Actions({
   onCancel: () => void;
   label?: string;
 }) {
-  const { saving } = useRecruitment();
+  const { saving, readOnly } = useRecruitment();
   return (
     <div className="col-span-full mt-3 flex justify-end gap-2">
       <button type="button" className="btn-secondary" onClick={onCancel}>
         취소
       </button>
-      <button type="submit" className="btn-primary" disabled={saving}>
+      <button type="submit" className="btn-primary" disabled={saving || readOnly}>
         {label}
       </button>
     </div>

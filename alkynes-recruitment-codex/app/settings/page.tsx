@@ -9,9 +9,10 @@ import {
   type RecruitmentData,
 } from '@/lib/recruitment';
 import { AutomaticBackups } from '@/components/AutomaticBackups';
+import { MobileAccess } from '@/components/MobileAccess';
 import { AppUpdate } from '@/components/AppUpdate';
 export default function Page() {
-  const { data, replace, storage, databasePath, saving } = useRecruitment();
+  const { data, replace, storage, databasePath, saving, readOnly } = useRecruitment();
   const [backup, setBackup] = useState<RecruitmentData | null>(null),
     [error, setError] = useState('');
   async function read(event: ChangeEvent<HTMLInputElement>) {
@@ -30,6 +31,7 @@ export default function Page() {
       setError(e instanceof Error ? e.message : '백업을 읽지 못했습니다.');
     }
   }
+  if (readOnly) return <p>설정은 노트북에서 관리해 주세요.</p>;
   return (
     <div className="space-y-6">
       <div>
@@ -39,6 +41,7 @@ export default function Page() {
         </p>
       </div>
       <AppUpdate />
+      <MobileAccess />
       <div className="card space-y-3 p-6"><h2>데이터 저장소</h2><p className="font-bold">{storage === 'sqlite' ? '노트북 SQLite 저장' : '브라우저 저장 (미리보기 / 이전 서버)'}</p>{databasePath && <p className="break-all text-sm text-slate-600">{databasePath}</p>}<p className="text-sm text-slate-600">{storage === 'sqlite' ? '채용 기록은 이 노트북의 DB 파일에 저장됩니다. 브라우저 기록을 지워도 DB는 유지되며, 외부 서버로 전송하지 않습니다. 이전 시점의 브라우저 원본과 최근 5회 저장 이력도 DB에 보관합니다.' : '현재 서버에는 SQLite 저장 기능이 없습니다. 노트북 앱을 업데이트하면 기존 브라우저 데이터를 DB로 이전합니다.'}</p></div>
       <AutomaticBackups onRestore={setBackup} />
       <div className="card space-y-4 p-6">

@@ -21,8 +21,10 @@ type Snapshot = {
   updatedAt: string;
   databasePath: string;
   backupWarning?: string;
+  readOnly?: boolean;
 };
 type Store = {
+  readOnly: boolean;
   data: RecruitmentData;
   ready: boolean;
   notice: string;
@@ -84,6 +86,7 @@ const empty = () => removeLegacySamples(seedData());
 export function RecruitmentProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<RecruitmentData>(empty),
     [ready, setReady] = useState(false),
+    [readOnly, setReadOnly] = useState(false),
     [notice, setNotice] = useState(''),
     [error, setError] = useState(''),
     [saving, setSaving] = useState(false),
@@ -96,6 +99,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
     revision: 0,
     data: empty(),
     blocked: false,
+    readOnly: false,
   });
   const queue = useRef(Promise.resolve(true)),
     pending = useRef(0);
@@ -161,6 +165,9 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (!snapshot) throw Error('DB 응답이 없습니다.');
+        state.current.readOnly = snapshot.readOnly === true;
+        setReadOnly(state.current.readOnly);
+        if (!snapshot.data && snapshot.readOnly) snapshot = { ...snapshot, data: empty() };
         if (!snapshot.data) {
           const raw = localStorage.getItem(storageKey),
             legacy: unknown = raw !== null ? JSON.parse(raw) : null;
@@ -268,6 +275,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
     setSaving(true);
     const result = queue.current.then(async () => {
       try {
+        if (state.current.readOnly) throw Error('휴대폰에서는 조회만 가능합니다. 노트북에서 수정해 주세요.');
         const mode = state.current.mode;
         if (mode === 'loading' || (state.current.blocked && !replacement))
           throw Error('저장소를 먼저 확인해 주세요.');
@@ -343,10 +351,12 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         saving,
         storage,
         databasePath,
+        readOnly,
         commit,
         replace,
       }}
     >
+      {readOnly && <div role="status" className="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm"><span>노트북 데이터 · 읽기 전용</span><form action="/__alkynes/mobile/logout" method="post" className="mt-2"><button className="btn-secondary text-xs">접속 종료</button></form></div>}
       {backupWarning && <div role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">DB 저장은 유지되지만 {backupWarning}. 설정에서 백업 폴더를 확인해 주세요.</div>}
       {error && (
         <div

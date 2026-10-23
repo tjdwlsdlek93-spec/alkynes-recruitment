@@ -100,3 +100,12 @@ test('daily Excel history retains all updates, exposes note edits and groups by 
   applyExcelSnapshot(data,plan);assert.equal(data.excelRuns.length,36);assert.equal(data.excelRuns[0].sourceModifiedAt,plan.sourceModifiedAt);
   const latest=data.excelRuns[0].id;applyExcelSnapshot(data,plan);assert.equal(data.excelRuns.length,36);assert.equal(data.excelRuns[0].id,latest);
 });
+test('acceptance text contains weekday, fixed start time and office floor, with editable documents',()=>{
+  const {acceptanceMessage}=load('messages');
+  const text=acceptanceMessage('검증지원자','검증공고','2026-10-22','신분증 사본\n통장 사본');
+  assert.match(text,/검증지원자님, 검증공고 최종 합격/);
+  assert.match(text,/2026년 10월 22일\(목\) 오전 08시 30분/);
+  assert.match(text,/장소: \(주\) 알킨스 사무동 2층\(면접 본 건물\)/);
+  assert.match(text,/제출서류:\n신분증 사본\n통장 사본/);
+  assert.doesNotMatch(text,/회신|처리기한/);
+});

@@ -15,12 +15,15 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <Sidebar />
-        <main className="min-h-screen p-4 md:ml-64 md:p-8">
-          <RecruitmentProvider>
-            <ExcelSyncProvider><SidebarUpdateActions />{children}</ExcelSyncProvider>
-          </RecruitmentProvider>
-        </main>
+        <RecruitmentProvider>
+          <Sidebar />
+          <main className="min-h-screen p-4 md:ml-64 md:p-8">
+            <ExcelSyncProvider>
+              <SidebarUpdateActions />
+              {children}
+            </ExcelSyncProvider>
+          </main>
+        </RecruitmentProvider>
       </body>
     </html>
   );
