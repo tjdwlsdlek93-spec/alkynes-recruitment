@@ -231,8 +231,19 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
             );
           adopt(removeLegacySamples(next.data), next.revision);
           setBackupWarning(next.backupWarning || '');
+          if (state.current.readOnly) { state.current.blocked = false; setReady(true); setError(''); }
         }
       } catch (error) {
+        if (active && state.current.readOnly) {
+          // An expired session or disconnected notebook must not leave stale schedules visible.
+          adopt(empty(), 0);
+          state.current.blocked = true;
+          setReady(false);
+          if (error instanceof StorageError && error.status === 401) {
+            window.location.reload();
+            return;
+          }
+        }
         if (active)
           setError(
             error instanceof Error ? error.message : 'DB 확인에 실패했습니다.',

@@ -107,5 +107,9 @@ test('acceptance text contains weekday, fixed start time and office floor, with 
   assert.match(text,/2026년 10월 22일\(목\) 오전 08시 30분/);
   assert.match(text,/장소: \(주\) 알킨스 사무동 2층\(면접 본 건물\)/);
   assert.match(text,/제출서류:\n신분증 사본\n통장 사본/);
-  assert.doesNotMatch(text,/회신|처리기한/);
+  assert.doesNotMatch(text,/회신|처리기한|기타안내사항|기타 안내사항/);
+  assert.match(acceptanceMessage('검증지원자','검증공고','','없음'),/출근일: 전화로 협의/);
+  const extra='첫날은 정문으로 오세요.\n담당자에게 연락 부탁드립니다.';
+  assert.ok(acceptanceMessage('검증지원자','검증공고','2026-10-22','없음',extra).includes('없음\n\n'+extra+'\n\n문의사항'));
+  assert.equal(acceptanceMessage('검증지원자','검증공고','2026-10-22','없음','   '),acceptanceMessage('검증지원자','검증공고','2026-10-22','없음'));
 });

@@ -250,3 +250,13 @@ main .card h2:not(.metric-label),.calendar-panel h2 { font-size:18px; line-heigh
 @media(prefers-reduced-motion:no-preference) { .todo-note.has-work { animation:todo-paper-glow 2.8s ease-in-out infinite; } .todo-note.has-work .todo-signal { animation:todo-signal-pulse 2.8s ease-in-out infinite; } }
 @media(min-width:1200px) { .dashboard-board { display:grid; grid-template-columns:minmax(0,1fr) 280px; align-items:start; gap:22px; } .dashboard-board > .dashboard-aside { display:flex; flex-direction:column; margin-top:0; } }
 @media(prefers-reduced-motion:reduce) { .todo-note.has-work,.todo-note .todo-signal { animation:none !important; } .todo-note.has-work { outline:2px solid #d69628; outline-offset:3px; } }
+
+/* Seven days fit on phones; full event text is shown below the selected day. */
+@media(max-width:639px) {
+  .calendar-controls { display:grid; width:100%; grid-template-columns:32px minmax(0,1fr) 32px auto; gap:6px; }
+  .calendar-controls .field { width:100% !important; }
+  .calendar-controls .btn-secondary { min-width:0; padding:8px; }
+  .calendar-panel .calendar-day { min-height:72px; padding:4px; }
+  .calendar-panel .calendar-day > span:first-child { font-size:12px; }
+  .calendar-panel .calendar-holiday { font-size:9px; line-height:12px; word-break:break-all; }
+}

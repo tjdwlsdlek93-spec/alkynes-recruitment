@@ -179,6 +179,7 @@ export default function Page() {
                 '지원경로',
                 '경력',
                 '진행 상태',
+                '출근일',
                 '관리',
               ].map((h) => (
                 <th className="px-5 py-3 text-left font-medium" key={h}>
@@ -201,6 +202,9 @@ export default function Page() {
                 <td className="px-5 py-4">{c.career || '—'}</td>
                 <td className="px-5 py-4">
                   <CandidateStatusBadge status={candidateStatus(c)} />
+                </td>
+                <td className="min-w-[180px] px-5 py-4">
+                  {['최종합격', '입사확정'].includes(candidateStatus(c)) ? c.expectedJoin ? <><p className="font-semibold">{formatDateOnly(c.expectedJoin)}</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : <><p className="font-semibold">전화로 협의</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : '—'}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex flex-wrap gap-2">

@@ -17,21 +17,37 @@ test('acceptance message copies entered date/documents; mobile login shows same 
     await api({data,revision:0});
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
     const context=await browser.newContext({permissions:['clipboard-read','clipboard-write']}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-    await page.goto(base+'/candidates');await page.getByRole('button',{name:'합격 안내문',exact:true}).click();const dialog=page.getByRole('dialog',{name:'합격 안내문',exact:true});
+    await page.goto(base+'/candidates');await page.getByRole('columnheader',{name:'출근일',exact:true}).waitFor();await page.getByRole('cell',{name:'2026년 10월 22일(목) 08시 30분',exact:true}).waitFor();await page.getByRole('button',{name:'합격 안내문',exact:true}).click();const dialog=page.getByRole('dialog',{name:'합격 안내문',exact:true});
     assert.equal(await dialog.getByLabel('출근일',{exact:true}).inputValue(),'2026-10-22');assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),true);
     await dialog.getByLabel('제출서류',{exact:true}).fill('신분증 사본\n통장 사본');await dialog.getByLabel('출근일',{exact:true}).fill('2026-10-26');
-    const text=await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue();assert.match(text,/2026년 10월 26일\(월\) 오전 08시 30분/);assert.match(text,/사무동 2층\(면접 본 건물\)/);
+    assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),false);
+    const additional=Array.from({length:12},(_,i)=>`추가 안내 ${i+1}: 첫날 정문으로 오세요.`).join('\n');
+    await dialog.getByLabel('기타 안내사항 (선택)',{exact:true}).fill(additional);
+    const text=await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue();assert.match(text,/2026년 10월 26일\(월\) 오전 08시 30분/);assert.match(text,/사무동 2층\(면접 본 건물\)/);assert.ok(text.includes(additional));assert.doesNotMatch(text,/기타 ?안내사항:/);
+    for(const width of [1280,390]) {
+      await page.setViewportSize({width,height:844});
+      await page.waitForTimeout(100);
+      for(const label of ['제출서류','기타 안내사항 (선택)','카톡에 보낼 내용']) assert.equal(await dialog.getByLabel(label,{exact:true}).evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,label+' must show its full content');
+    }
+    await page.setViewportSize({width:1280,height:900});
     await dialog.getByRole('button',{name:'안내문 복사',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),text);assert.equal((await api()).revision,1);
     await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).fill(text+'\n추가 안내');await dialog.getByRole('button',{name:'안내문 복사',exact:true}).click();assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/추가 안내$/);
+    await dialog.getByLabel('출근일',{exact:true}).fill('');assert.match(await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue(),/출근일: 전화로 협의/);assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),false);
     await page.goto(base+'/settings');await page.getByRole('heading',{name:'휴대폰 개인 접속',exact:true}).waitFor();await page.getByRole('status').filter({hasText:'휴대폰 접속 꺼짐'}).waitFor();
+    const beforePhone=await api();beforePhone.data.candidates.push({...beforePhone.data.candidates[0],id:'synthetic-withdrawn',name:'검증포기자',status:'면접예정',expectedJoin:undefined});beforePhone.data.interviews=[{...seedData().interviews[0],id:'synthetic-interview',candidateId:'synthetic-withdrawn',startsAt:'2026-10-22T05:00:00Z',status:'면접예정'}];
+    async function update(snapshot){const response=await fetch(base+'/__alkynes/data',{method:'POST',headers:{'X-Alkynes-Client':'1','Content-Type':'application/json'},body:JSON.stringify({data:snapshot.data,revision:snapshot.revision})});assert.equal(response.status,200);}
+    await update(beforePhone);
     const password='synthetic-password-123',salt='b'.repeat(32);let mobile;
     remote=http.createServer((req,res)=>{Object.defineProperty(req.socket,'remoteAddress',{value:'100.90.0.2',configurable:true});mobile(req,res);});await new Promise(r=>remote.listen(0,'127.0.0.1',r));const remoteBase='http://127.0.0.1:'+remote.address().port;
     mobile=createMobileHandler({host:'127.0.0.1:'+remote.address().port,localPort:port,salt,passwordHash:crypto.scryptSync(password,salt,32).toString('hex')});
-    const phone=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),view=await phone.newPage();view.on('pageerror',e=>errors.push(e.message));
+    const phone=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),view=await phone.newPage();view.on('pageerror',e=>errors.push(e.message));await view.clock.install({time:new Date('2026-10-22T10:00:00+09:00')});
     await view.goto(remoteBase+'/candidates');await view.getByLabel('접속 비밀번호',{exact:true}).fill(password);await view.getByRole('button',{name:'조회 시작',exact:true}).click();await view.getByText('노트북 데이터 · 읽기 전용',{exact:true}).waitFor({timeout:10000}).catch(async e=>{console.log('Phone screen',view.url(),await view.locator('body').innerText());throw e;});
     assert.equal(await view.getByRole('link',{name:'설정',exact:true}).count(),0);assert.equal(await view.getByRole('button',{name:'앱 업데이트',exact:true}).count(),0);
+    const calendar=view.getByLabel('채용 일정 캘린더',{exact:true});await calendar.waitFor();assert.equal(await calendar.locator('.calendar-grid').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+    const box=await calendar.boundingBox();assert.ok(box.x>=0 && box.x+box.width<=391);await calendar.getByRole('button',{name:/2026년 10월 22일/}).click();await calendar.getByLabel('선택한 날짜 일정',{exact:true}).getByText(/검증포기자/).waitFor();
+    await view.locator('.week-note').getByText(/검증포기자/).waitFor();const changed=await api();changed.data.candidates.find(c=>c.id==='synthetic-withdrawn').excelFinal='지원포기';await update(changed);await view.locator('.week-note').getByText(/검증포기자/).waitFor({state:'detached',timeout:15000});
     await view.getByRole('link',{name:'지원자',exact:true}).click();await view.getByText('검증지원자',{exact:true}).waitFor();assert.equal(await view.getByRole('button',{name:'+ 지원자 등록',exact:true}).isDisabled(),true);
     await view.getByRole('button',{name:'상세 / 수정',exact:true}).click();const details=view.getByRole('dialog');assert.equal(await details.getByRole('button',{name:'저장',exact:true}).isDisabled(),true);assert.equal(await details.locator('input[name=name]').isDisabled(),true);
-    await view.screenshot({path:'/workspace/scratch/mobile-readonly.png',fullPage:true});assert.equal((await api()).revision,1);await details.getByRole('button',{name:'닫기',exact:true}).click();await view.getByRole('button',{name:'접속 종료',exact:true}).click();await view.getByLabel('접속 비밀번호',{exact:true}).waitFor();assert.equal((await phone.request.get(remoteBase+'/__alkynes/data')).status(),401);assert.deepEqual(errors,[]);
+    await view.screenshot({path:'/workspace/scratch/mobile-readonly.png',fullPage:true});assert.equal((await api()).revision,3);await details.getByRole('button',{name:'닫기',exact:true}).click();mobile=createMobileHandler({host:'127.0.0.1:'+remote.address().port,localPort:port,salt,passwordHash:crypto.scryptSync(password,salt,32).toString('hex')});await view.getByLabel('접속 비밀번호',{exact:true}).waitFor();assert.equal((await phone.request.get(remoteBase+'/__alkynes/data')).status(),401);assert.deepEqual(errors,[]);
   }finally{if(browser)await browser.close();if(remote){remote.closeAllConnections();await new Promise(r=>remote.close(r));}if(child&&child.exitCode===null){const ended=new Promise(r=>child.once('exit',r));child.kill();await ended;}await fs.rm(root,{recursive:true,force:true});}
 });

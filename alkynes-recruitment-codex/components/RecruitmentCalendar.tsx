@@ -34,7 +34,7 @@ export function RecruitmentCalendar() {
             면접 · 요청 접수 · 미완료 요청 마감
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="calendar-controls flex items-center gap-2">
           <button
             className="btn-secondary"
             onClick={() => move(-1)}
@@ -74,7 +74,7 @@ export function RecruitmentCalendar() {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <div className="min-w-[560px]">
+        <div className="calendar-grid min-w-0">
           <div className="grid grid-cols-7 text-center text-xs text-slate-500">
             {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
               <div className={'py-2 ' + (day === '일' ? 'text-red-600' : day === '토' ? 'text-blue-600' : '')} key={day}>
@@ -101,7 +101,7 @@ export function RecruitmentCalendar() {
                   aria-pressed={selected === date}
                   onClick={() => setSelected(date)}
                   className={
-                    'min-h-28 min-w-0 border-b border-r p-2 text-left align-top ' +
+                    'calendar-day min-h-28 min-w-0 border-b border-r p-2 text-left align-top ' +
                     (selected === date
                       ? 'bg-blue-50 ring-2 ring-inset ring-blue-500'
                       : 'hover:bg-slate-50')
@@ -118,12 +118,12 @@ export function RecruitmentCalendar() {
                   >
                     {i + 1}
                   </span>
-                  {day.holidays.length > 0 && <span className="mt-1 block break-keep text-[11px] font-semibold leading-4 text-red-600">{day.holidays.join(' · ')}</span>}
+                  {day.holidays.length > 0 && <span className="calendar-holiday mt-1 block break-keep text-[11px] font-semibold leading-4 text-red-600">{day.holidays.join(' · ')}</span>}
                   {rows.slice(0, 3).map((e) => (
                     <span
                       key={e.id}
                       className={
-                        'mt-1 block truncate rounded px-1 py-0.5 text-[11px] ' +
+                        'mt-1 hidden truncate rounded px-1 py-0.5 text-[11px] sm:block ' +
                         (e.status === '요청 전'
                           ? 'bg-amber-100 text-amber-900'
                           : e.status === '요청 완료'
@@ -135,8 +135,9 @@ export function RecruitmentCalendar() {
                       {e.title} · {e.status}
                     </span>
                   ))}
+                  {rows.length > 0 && <span className="mt-1 block text-[10px] font-semibold sm:hidden">{rows.length}건</span>}
                   {rows.length > 3 && (
-                    <span className="text-xs text-slate-500">
+                    <span className="hidden text-xs text-slate-500 sm:inline">
                       +{rows.length - 3}건 더 보기
                     </span>
                   )}
