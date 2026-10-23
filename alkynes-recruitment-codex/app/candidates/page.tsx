@@ -103,10 +103,11 @@ export default function Page() {
       setBusy(false);
     }
   }
+  const completedCandidate = (c: Candidate) => candidateStatus(c) === '실제 입사' || closedJob(data.requisitions.find(r => r.id === c.requisitionId)!);
   const rows = data.candidates.filter(
     (c) =>
       (!req || c.requisitionId === req) &&
-      (group === 'all' || (group === 'ended' ? endedCandidate(c) : group === 'closed' ? closedJob(data.requisitions.find(r => r.id === c.requisitionId)!) : !closedJob(data.requisitions.find(r => r.id === c.requisitionId)!) && !endedCandidate(c))) &&
+      (group === 'all' || (group === 'ended' ? !completedCandidate(c) && endedCandidate(c) : group === 'closed' ? completedCandidate(c) : !completedCandidate(c) && !endedCandidate(c))) &&
       (status === '__archived' ? !!c.excelMissing : !c.excelMissing) &&
       (!status || status === '__archived' || candidateStatus(c) === status) &&
       (c.name + ' ' + c.source + ' ' + c.career + ' ' + [data.requisitions.find(r => r.id === c.requisitionId)?.role, data.requisitions.find(r => r.id === c.requisitionId)?.department, data.requisitions.find(r => r.id === c.requisitionId)?.code].join(' '))
@@ -122,7 +123,7 @@ export default function Page() {
         <div>
           <h1 className="text-2xl font-bold">지원자</h1>
           <p className="mt-1 text-sm text-slate-500">
-            진행중인 지원자를 기본으로 표시합니다. 불합격·지원포기·입사포기·실제 입사자는 전형 종료에서 확인하세요.
+            진행중인 지원자를 기본으로 표시합니다. 불합격·지원포기·입사포기는 전형 종료에서, 실제 입사자는 채용 완료 기록에서 확인하세요.
           </p>
         </div>
         <button
@@ -135,7 +136,7 @@ export default function Page() {
       </div>
       {!data.requisitions.length && <p>먼저 채용 요청을 등록해 주세요.</p>}
       <div className="flex flex-wrap gap-3">
-        <select className="field max-w-xs" aria-label="지원자 채용 분류" value={group} onChange={e => { setGroup(e.target.value); setReq(''); }}><option value="active">전형 진행중</option><option value="ended">전형 종료 (불합격·포기·입사)</option><option value="closed">채용 완료 기록</option><option value="all">전체 지원자</option></select>
+        <select className="field max-w-xs" aria-label="지원자 채용 분류" value={group} onChange={e => { setGroup(e.target.value); setReq(''); }}><option value="active">전형 진행중</option><option value="ended">전형 종료 (불합격·포기)</option><option value="closed">채용 완료 기록</option><option value="all">전체 지원자</option></select>
         <input
           className="field max-w-xs"
           aria-label="지원자 검색"
