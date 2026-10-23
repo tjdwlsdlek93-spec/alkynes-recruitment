@@ -21,14 +21,12 @@ export function sampleMessage(kind: '인적성' | '면접', audience: Audience) 
   return notice + interviewMessage({ requisitions: [], candidates: [] } as unknown as RecruitmentData, { status: '면접예정', startsAt: '' } as Interview, audience).replace('지원자님', '[지원자명]님');
 }
 
-export function acceptanceMessage(name: string, role: string, startsOn: string, documents: string, additional = '') {
+export function acceptanceMessage(name: string, role: string, startsOn: string, documents: string | null, additional = '') {
   return `안녕하세요, 알킨스 경영지원팀 민성진 과장입니다.
 ${name}님, ${role} 최종 합격을 축하드립니다!
 
 출근일: ${startsOn ? formatDateOnly(startsOn) + ' 오전 08시 30분' : '전화로 협의 (출근시간 08시 30분)'}
-장소: (주) 알킨스 사무동 2층(면접 본 건물)
-제출서류:
-${documents.trim() || '[제출서류 입력]'}${additional.trim() ? '\n\n' + additional : ''}
+장소: (주) 알킨스 사무동 2층(면접 본 건물)${documents === null ? '' : '\n제출서류:\n' + (documents.trim() || '[제출서류 입력]')}${additional.trim() ? '\n\n' + additional : ''}
 
 문의사항 있으시면 연락 부탁드립니다.
 감사합니다.`;

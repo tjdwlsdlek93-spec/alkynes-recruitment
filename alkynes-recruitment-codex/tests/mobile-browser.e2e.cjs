@@ -32,6 +32,10 @@ test('acceptance message copies entered date/documents; mobile login shows same 
     await page.setViewportSize({width:1280,height:900});
     await dialog.getByRole('button',{name:'안내문 복사',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),text);assert.equal((await api()).revision,1);
     await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).fill(text+'\n추가 안내');await dialog.getByRole('button',{name:'안내문 복사',exact:true}).click();assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/추가 안내$/);
+    await dialog.getByRole('button',{name:'제출서류 삭제',exact:true}).click();assert.equal(await dialog.getByLabel('제출서류',{exact:true}).count(),0);
+    const withoutDocuments=await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue();assert.doesNotMatch(withoutDocuments,/제출서류|신분증 사본|통장 사본/);assert.ok(withoutDocuments.includes(additional));
+    await dialog.getByRole('button',{name:'안내문 복사',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),withoutDocuments);
+    await dialog.getByRole('button',{name:'+ 제출서류 추가',exact:true}).click();assert.match(await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue(),/제출서류:\n신분증 사본/);
     await dialog.getByLabel('출근일',{exact:true}).fill('');assert.match(await dialog.getByLabel('카톡에 보낼 내용',{exact:true}).inputValue(),/출근일: 전화로 협의/);assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),false);
     await page.goto(base+'/settings');await page.getByRole('heading',{name:'휴대폰 개인 접속',exact:true}).waitFor();await page.getByRole('status').filter({hasText:'휴대폰 접속 꺼짐'}).waitFor();
     const beforePhone=await api();beforePhone.data.candidates.push({...beforePhone.data.candidates[0],id:'synthetic-withdrawn',name:'검증포기자',status:'면접예정',expectedJoin:undefined});beforePhone.data.interviews=[{...seedData().interviews[0],id:'synthetic-interview',candidateId:'synthetic-withdrawn',startsAt:'2026-10-22T05:00:00Z',status:'면접예정'}];
