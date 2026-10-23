@@ -384,3 +384,19 @@ test('Korean weekday dates match interview messages and Korean midnight boundari
   }
   assert.equal(formatDate(''), '미정');
 });
+test('actual join date, notes and interview fields remain aligned when the expected-date column is deleted', async () => {
+  const book=new ExcelJS.Workbook();await book.xlsx.load(await sample());
+  const sheet=book.getWorksheet('채용프로세스 적시성');
+  sheet.getCell('N7').value=new Date('2026-10-19T00:00:00Z');
+  sheet.getCell('O7').value=new Date('2026-10-20T00:00:00Z');
+  sheet.getCell('P7').value='열 이동 검증 메모';
+  sheet.getCell('AF5').value='면접장소';sheet.getCell('AF7').value='열 이동 검증 회의실';
+  sheet.getCell('AG5').value='면접관';sheet.getCell('AG7').value='검증면접관';
+  const parse=async()=>{const bytes=await book.xlsx.writeBuffer();return parseExcel(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'synthetic.xlsx');};
+  const legacy=await parse();sheet.spliceColumns(14,1);const current=await parse();
+  const person=plan=>plan.candidates.find(c=>c.name==='테스트갑');
+  assert.ok(person(current).actualJoin);assert.equal(person(current).actualJoin,person(legacy).actualJoin);assert.equal(person(current).expectedJoin,'');assert.equal(person(current).status,'실제 입사');
+  assert.deepEqual(current.interviews.map(i=>[i.id,i.location,i.interviewers]),legacy.interviews.map(i=>[i.id,i.location,i.interviewers]));
+  assert.deepEqual(current.requests.map(q=>q.excelValues['비고']),legacy.requests.map(q=>q.excelValues['비고']));
+  sheet.spliceColumns(14,1);await assert.rejects(parse,/열 제목/);
+});

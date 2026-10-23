@@ -30,7 +30,7 @@ function GrowingTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} ref={ref} rows={3} style={{ minHeight: 96, resize: 'none', overflow: 'hidden' }} />;
 }
 export function AcceptanceMessage({ person, role, onClose }: { person: Candidate; role: string; onClose: () => void }) {
-  const [date, setDate] = useState(person.expectedJoin?.slice(0, 10) || '');
+  const [date, setDate] = useState(person.actualJoin?.slice(0, 10) || '');
   const [documents, setDocuments] = useState('');
   const [includeDocuments, setIncludeDocuments] = useState(true);
   const [additional, setAdditional] = useState('');

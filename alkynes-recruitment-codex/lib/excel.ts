@@ -135,13 +135,15 @@ export async function parseExcel(
     '실제 입사일',
     '비고',
   ];
-  if (headers.some((h, i) => text(sheet.getRow(5).getCell(i + 1).value) !== h))
-    throw Error(
-      '5행 A~P열의 제목이 10월 14일 파일 구조와 다릅니다. 열 제목을 확인해 주세요.',
-    );
+  // The legacy expected-date column is optional. Keep logical field indices stable.
+  const expectedColumnPresent = text(sheet.getRow(5).getCell(14).value) === '입사예정일';
+  const sourceHeaders = headers.filter(header => header !== '입사예정일' || expectedColumnPresent);
+  if (sourceHeaders.some((header, index) => text(sheet.getRow(5).getCell(index + 1).value) !== header))
+    throw Error('5행 열 제목을 확인해 주세요. 입사예정일 열은 생략할 수 있으며, 실제 입사일·비고 등 나머지 기본 열은 유지해야 합니다.');
+  const sourceColumns = headers.map(header => sourceHeaders.indexOf(header) + 1);
   const optionalColumn = (names: string[]) => {
     const columns: number[] = [];
-    for (let col = 17; col <= sheet.columnCount; col++) {
+    for (let col = sourceHeaders.length + 1; col <= sheet.columnCount; col++) {
       if (names.includes(text(sheet.getRow(5).getCell(col).value).replace(/\s+/g, ''))) columns.push(col);
     }
     if (columns.length > 1) throw Error(names[0] + ' 열이 중복되어 있습니다. 제목을 확인해 주세요.');
@@ -184,7 +186,7 @@ export async function parseExcel(
   });
   for (let n = 6; n <= sheet.rowCount; n++) {
     const row = sheet.getRow(n),
-      v = (col: number) => row.getCell(col).value;
+      v = (col: number) => sourceColumns[col - 1] ? row.getCell(sourceColumns[col - 1]).value : null;
     const title = text(v(1));
     if (!title) continue;
     plan.rows++;
@@ -299,8 +301,8 @@ export async function parseExcel(
     const id = await key('excel-request', [...group, String(round)]);
     const dateValues: Record<number, string> = { 6: receivedAt, 7: completedAt, 8: cachedDue, 10: examAt, 11: interviewAt, 14: expectedJoin, 15: actualJoin };
     const excelValues = Object.fromEntries(headers.map((header, index) => [header, index + 1 in dateValues ? (dateValues[index + 1] ? formatDate(dateValues[index + 1]) : '') : text(v(index + 1))]));
-    if (locationColumn) excelValues['면접장소'] = text(v(locationColumn));
-    if (interviewerColumn) excelValues['면접관'] = text(v(interviewerColumn));
+    if (locationColumn) excelValues['면접장소'] = text(row.getCell(locationColumn).value);
+    if (interviewerColumn) excelValues['면접관'] = text(row.getCell(interviewerColumn).value);
     plan.requests.push({
       ...stamp(id),
       source: 'kpi-excel',
@@ -332,8 +334,8 @@ export async function parseExcel(
           current,
         ) || !!actualJoin;
       const previous = interviewMap.get(iid);
-      const location = locationColumn ? text(v(locationColumn)) : '';
-      const interviewers = interviewerColumn ? [...new Set(text(v(interviewerColumn)).split(/[,，;；\r\n]+/).map(name => name.trim()).filter(Boolean))] : [];
+      const location = locationColumn ? text(row.getCell(locationColumn).value) : '';
+      const interviewers = interviewerColumn ? [...new Set(text(row.getCell(interviewerColumn).value).split(/[,，;；\r\n]+/).map(name => name.trim()).filter(Boolean))] : [];
       interviewMap.set(iid, {
         ...stamp(iid),
         source: 'kpi-excel',

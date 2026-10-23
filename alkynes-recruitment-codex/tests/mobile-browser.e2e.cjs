@@ -12,13 +12,13 @@ test('acceptance message copies entered date/documents; mobile login shows same 
     for(let n=0;n<60;n++){try{if((await fetch(base+'/__alkynes/health')).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
     const {seedData}=require(path.join(root,'site/_server/recruitment.cjs'));const data=seedData();
     data.requisitions=[{...data.requisitions[0],id:'synthetic-job',role:'검증공고'}];
-    data.candidates=[{...data.candidates[0],id:'synthetic-person',requisitionId:'synthetic-job',name:'검증지원자',status:'최종합격',expectedJoin:'2026-10-22'}];
+    data.candidates=[{...data.candidates[0],id:'synthetic-person',requisitionId:'synthetic-job',name:'검증지원자',status:'최종합격',expectedJoin:'2026-10-19'}];
     data.interviews=[];data.evaluations=[];data.activity=[];data.requests=[];
     await api({data,revision:0});
     browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
     const context=await browser.newContext({permissions:['clipboard-read','clipboard-write']}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-    await page.goto(base+'/candidates');await page.getByRole('columnheader',{name:'출근일',exact:true}).waitFor();await page.getByRole('cell',{name:'2026년 10월 22일(목) 08시 30분',exact:true}).waitFor();await page.getByRole('button',{name:'합격 안내문',exact:true}).click();const dialog=page.getByRole('dialog',{name:'합격 안내문',exact:true});
-    assert.equal(await dialog.getByLabel('출근일',{exact:true}).inputValue(),'2026-10-22');assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),true);
+    await page.goto(base+'/candidates');await page.getByRole('columnheader',{name:'출근일',exact:true}).waitFor();await page.getByRole('cell',{name:'전화로 협의 08시 30분',exact:true}).waitFor();await page.getByRole('button',{name:'합격 안내문',exact:true}).click();const dialog=page.getByRole('dialog',{name:'합격 안내문',exact:true});
+    assert.equal(await dialog.getByLabel('출근일',{exact:true}).inputValue(),'');assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),true);
     await dialog.getByLabel('제출서류',{exact:true}).fill('신분증 사본\n통장 사본');await dialog.getByLabel('출근일',{exact:true}).fill('2026-10-26');
     assert.equal(await dialog.getByRole('button',{name:'안내문 복사',exact:true}).isDisabled(),false);
     const additional=Array.from({length:12},(_,i)=>`추가 안내 ${i+1}: 첫날 정문으로 오세요.`).join('\n');
@@ -53,7 +53,7 @@ test('acceptance message copies entered date/documents; mobile login shows same 
     await view.locator('.week-note').getByText(/검증포기자/).waitFor();const changed=await api();changed.data.candidates.find(c=>c.id==='synthetic-withdrawn').excelFinal='지원포기';await update(changed);await view.locator('.week-note').getByText(/검증포기자/).waitFor({state:'detached',timeout:15000});
     await view.getByRole('link',{name:'지원자',exact:true}).click();await view.getByText('검증지원자',{exact:true}).waitFor();assert.equal(await view.getByRole('button',{name:'+ 지원자 등록',exact:true}).isDisabled(),true);
     await view.getByLabel('지원자 채용 분류',{exact:true}).selectOption('ended');await view.getByText('검증포기자',{exact:true}).waitFor();assert.equal(await view.getByText('검증입사자',{exact:true}).count(),0);
-    await view.getByLabel('지원자 채용 분류',{exact:true}).selectOption('closed');await view.getByText('검증입사자',{exact:true}).waitFor();assert.equal(await view.getByText('검증포기자',{exact:true}).count(),0);
+    await view.getByLabel('지원자 채용 분류',{exact:true}).selectOption('closed');await view.getByText('검증입사자',{exact:true}).waitFor();await view.getByRole('cell',{name:'2026년 10월 22일(목) 08시 30분',exact:true}).waitFor();assert.equal(await view.getByText('검증포기자',{exact:true}).count(),0);
     await view.getByLabel('지원자 채용 분류',{exact:true}).selectOption('active');
     await view.getByRole('button',{name:'상세 / 수정',exact:true}).click();const details=view.getByRole('dialog');assert.equal(await details.getByRole('button',{name:'저장',exact:true}).isDisabled(),true);assert.equal(await details.locator('input[name=name]').isDisabled(),true);
     await view.screenshot({path:'/workspace/scratch/mobile-readonly.png',fullPage:true});assert.equal((await api()).revision,3);await details.getByRole('button',{name:'닫기',exact:true}).click();mobile=createMobileHandler({host:'127.0.0.1:'+remote.address().port,localPort:port,salt,passwordHash:crypto.scryptSync(password,salt,32).toString('hex')});await view.getByLabel('접속 비밀번호',{exact:true}).waitFor();assert.equal((await phone.request.get(remoteBase+'/__alkynes/data')).status(),401);assert.deepEqual(errors,[]);

@@ -205,7 +205,7 @@ export default function Page() {
                   <CandidateStatusBadge status={candidateStatus(c)} />
                 </td>
                 <td className="min-w-[180px] px-5 py-4">
-                  {['최종합격', '입사확정'].includes(candidateStatus(c)) ? c.expectedJoin ? <><p className="font-semibold">{formatDateOnly(c.expectedJoin)}</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : <><p className="font-semibold">전화로 협의</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : '—'}
+                  {c.actualJoin ? <><p className="font-semibold">{formatDateOnly(c.actualJoin)}</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : ['최종합격', '입사확정'].includes(candidateStatus(c)) ? <><p className="font-semibold">전화로 협의</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : '—'}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex flex-wrap gap-2">
@@ -248,11 +248,7 @@ export default function Page() {
           {editing?.excelStage !== undefined && (
             <p className="mb-4 rounded-xl bg-slate-50 p-3 text-sm">
               {finalStatus(editing.excelFinal) ? '최종 결과 반영 상태' : '엑셀 선발 단계'}: {finalStatus(editing.excelFinal) ? candidateStatus(editing) : editing.excelStage || '미입력'} · 최종 결과:{' '}
-              {editing.excelFinal || '미입력'} · 입사예정일:{' '}
-              {editing.expectedJoin
-                ? formatDateOnly(editing.expectedJoin)
-                : '미입력'}{' '}
-              · 실제입사일:{' '}
+              {editing.excelFinal || '미입력'} · 실제입사일:{' '}
               {editing.actualJoin ? formatDateOnly(editing.actualJoin) : '미입력'}
             </p>
           )}

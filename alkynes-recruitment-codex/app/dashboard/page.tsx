@@ -31,19 +31,17 @@ export default function Dashboard() {
       new Date(i.startsAt) < end,
   );
   const month = today.slice(0, 7);
-  const hired = data.candidates.filter(c => !c.excelMissing && c.expectedJoin && koreaDate(c.expectedJoin).startsWith(month) && ['입사확정', '실제 입사', '최종합격'].includes(c.status)).length;
   return (
     <div className="space-y-6">
       <header className="dashboard-hero">
         <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro"><strong>오늘의 채용, 어디까지 왔을까요?</strong><br/>진행 중인 일정과 지원자를 확인해보세요.</p></div>
         <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>나만의 채용 아지트</small></div>
       </header>
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {[
           ['진행중 채용', active.length],
           ['전형 요청자 (진행중 채용)', active.reduce((n, r) => n + requestedPeople(data, r.id).length, 0)],
           ['이번주 면접', thisWeek.length],
-          ['이번 달 입사예정', hired],
           [
             '이번 달 실제 입사',
             data.candidates.filter(
@@ -53,7 +51,7 @@ export default function Dashboard() {
         ].map(([k, v], index) => (
           <div className="metric-paper" key={String(k)}><div className="card metric-note">
             <h2 className="metric-label">{k}</h2>
-            <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 입사예정일 기준', '이번 달 실제 입사일 기준'][index]}</p>
+            <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 실제 입사일 기준'][index]}</p>
             <svg className="metric-fold" viewBox="0 0 30 30" aria-hidden="true">
               <path d="M1 1L29 29H5Q1 29 1 25Z" fill="#35322c" opacity=".18" transform="translate(-2 3)"/>
               <path d="M1 1L29 29H5Q1 29 1 25Z" fill="var(--fold-color)" stroke="var(--ink)" strokeWidth="1.6" strokeLinejoin="round"/>

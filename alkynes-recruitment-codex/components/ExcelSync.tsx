@@ -13,7 +13,7 @@ import { parseExcel, applyExcelSnapshot, type ExcelPlan } from '@/lib/excel';
 import { changeSummary } from '@/lib/excel-changes';
 import { download, formatDate } from '@/lib/recruitment';
 const META = 'alkynes.excelSync.v1';
-const IMPORT_SCHEMA = 6;
+const IMPORT_SCHEMA = 7;
 const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {

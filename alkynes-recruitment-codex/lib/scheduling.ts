@@ -60,7 +60,6 @@ export function calendarEvents(data: RecruitmentData): CalendarEvent[] {
   for (const c of data.candidates.filter(c=>!c.excelMissing)) {
     for (const [kind, dates] of [
       ['인적성 검사', (data.requests || []).some(q => q.candidateId === c.id && q.stage === '인적성 검사 요청' && q.examAt) ? [] : c.examDates || []],
-      ['입사예정', c.expectedJoin ? [c.expectedJoin] : []],
       ['실제 입사', c.actualJoin ? [c.actualJoin] : []],
     ] as const) {
       for (const date of dates)
