@@ -1,4 +1,5 @@
 import './globals.css';
+import { AppDiagnostics } from '@/components/AppDiagnostics';
 import { SidebarUpdateActions } from '@/components/SidebarUpdateActions';
 import { Sidebar } from '@/components/Sidebar';
 import { ExcelSyncProvider } from '@/components/ExcelSync';
@@ -21,6 +22,7 @@ export default function RootLayout({
             <ExcelSyncProvider>
               <SidebarUpdateActions />
               {children}
+              <AppDiagnostics />
             </ExcelSyncProvider>
           </main>
         </RecruitmentProvider>

@@ -1,21 +1,24 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { reloadCurrentPage, useAppVersion } from '@/lib/app-version';
 export function MobileRefresh() {
-  const [version, setVersion] = useState('');
+  const { version, outdated } = useAppVersion();
   useEffect(() => {
-    let active = true;
-    void fetch('/__alkynes/health', { cache: 'no-store', signal: AbortSignal.timeout(10000) })
-      .then(response => response.ok ? response.json() : null)
-      .then(value => { if (active && typeof value?.version === 'string') setVersion(value.version); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, []);
+    if (!outdated) return;
+    const refresh = () => {
+      if (document.visibilityState === 'hidden' || document.querySelector('dialog[open]')) return;
+      // Retry once per server version, without an automatic reload loop.
+      try {
+        if (sessionStorage.getItem('alkynes.screenReloadVersion') === version) return;
+        sessionStorage.setItem('alkynes.screenReloadVersion', version);
+      } catch { return; }
+      reloadCurrentPage();
+    };
+    refresh(); const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [outdated, version]);
   return <div className="mt-2 space-y-2">
-    {version && <p className="text-xs text-slate-500">노트북 앱 버전 {version}</p>}
-    <button type="button" className="btn-secondary" onClick={() => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('_refresh', Date.now() + '-' + Math.random().toString(36).slice(2));
-      window.location.replace(url.href);
-    }}>최신 내용 불러오기</button>
+    {outdated && <p role="alert" className="text-sm text-amber-800">새 버전이 있습니다. 작성 중인 내용을 확인한 뒤 화면을 새로 불러오세요.</p>}
+    <button type="button" className="btn-secondary" onClick={reloadCurrentPage}>최신 내용 불러오기</button>
   </div>;
 }

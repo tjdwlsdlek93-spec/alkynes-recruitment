@@ -1,1 +1,1 @@
-{"app": "alkynes-recruitment", "version": "2026.10.26.1", "notes": "지원자 면접 안내문의 인사와 일정 안내를 한 문단으로 연결하고, 장소와 주소의 줄바꿈 제거."}
+{"app": "alkynes-recruitment", "version": "2026.10.26.2", "notes": "PC·모바일 면접 안내문 형식 공동 검증, 모바일 화면 버전 감지·갱신 및 VPN HTTP 복사 지원 개선."}
