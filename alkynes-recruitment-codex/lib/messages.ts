@@ -12,7 +12,7 @@ export function aptitudeMessage(data: RecruitmentData, q: ProcessRequest, _audie
 export function interviewMessage(data: RecruitmentData, i: Interview, audience: Audience) {
   const person = data.candidates.find(c => c.id === i.candidateId), job = data.requisitions.find(r => r.id === person?.requisitionId);
   const subject = i.status === '취소' ? '면접 일정이 취소되었습니다.' : i.status === '확인 필요' ? '면접 일정 확인이 필요합니다. 아래 일정은 미확정입니다.' : i.status === '면접완료' ? '진행한 면접 일정 공유드립니다.' : '면접 일정 안내드립니다.';
-  if (audience === 'candidate') return `안녕하세요, 알킨스 경영지원팀 민성진 과장입니다.\n${person?.name || '지원자'}님, ${job?.role || '채용'} ${subject}\n\n일시: ${date(i.startsAt)}\n장소: ${interviewRoom}\n${address}\n\n문의사항 있으시면 연락 부탁드립니다.\n감사합니다.`;
+  if (audience === 'candidate') return `안녕하세요, 알킨스 경영지원팀 민성진 과장입니다. ${person?.name || '지원자'}님, ${job?.role || '채용'} ${subject}\n\n일시: ${date(i.startsAt)}\n장소: ${interviewRoom} ${address}\n\n문의사항 있으시면 연락 부탁드립니다.\n감사합니다.`;
   return `안녕하세요!\n${job?.role || '채용'} / ${person?.name || '지원자'} ${subject.replace('안내드립니다.', '공유드립니다.')}\n일시: ${date(i.startsAt)}\n장소: ${interviewRoom}`;
 }
 export function sampleMessage(kind: '인적성' | '면접', audience: Audience) {
