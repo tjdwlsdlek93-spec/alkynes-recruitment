@@ -130,13 +130,13 @@ export default function Page() {
             진행중인 지원자를 기본으로 표시합니다. 불합격·지원포기·입사포기는 전형 종료에서, 실제 입사자는 채용 완료 기록에서 확인하세요.
           </p>
         </div>
-        <button
+        {!readOnly && <button
           className="btn-primary"
-          disabled={readOnly || !data.requisitions.length}
+          disabled={!data.requisitions.length}
           onClick={() => setEditing(null)}
         >
           + 지원자 등록
-        </button>
+        </button>}
       </div>
       {!data.requisitions.length && <p>먼저 채용 요청을 등록해 주세요.</p>}
       <div className="flex flex-wrap gap-3">
@@ -175,7 +175,7 @@ export default function Page() {
         </select>
       </div>
       <div className="card overflow-x-auto">
-        <table className="w-full whitespace-nowrap text-sm">
+        <table className="candidates-table w-full whitespace-nowrap text-sm" aria-label="지원자 목록">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
               {[
@@ -198,26 +198,26 @@ export default function Page() {
               const job = data.requisitions.find(r => r.id === c.requisitionId);
               return (
               <tr className="border-t" key={c.id}>
-                <td className="px-5 py-4 font-semibold">{c.name}</td>
-                <td className="min-w-[220px] max-w-sm whitespace-normal px-5 py-4">
+                <td className="candidate-name px-5 py-4 font-semibold">{c.name}</td>
+                <td className="candidate-job min-w-[220px] max-w-sm whitespace-normal px-5 py-4"><span className="mobile-cell-label" aria-hidden="true">지원 공고</span>
                   <p className="break-keep font-bold">{job?.role || '공고 정보 없음'}</p>
                   <p className="mt-1 text-xs text-slate-500">{job?.department || '부서 미입력'} · {job?.code || '—'}</p>
                 </td>
-                <td className="px-5 py-4">{c.source || '—'}</td>
-                <td className="px-5 py-4">{c.career || '—'}</td>
+                <td className="px-5 py-4"><span className="mobile-cell-label" aria-hidden="true">지원경로</span>{c.source || '—'}</td>
+                <td className="px-5 py-4"><span className="mobile-cell-label" aria-hidden="true">경력</span>{c.career || '—'}</td>
                 <td className="px-5 py-4">
-                  <CandidateStatusBadge status={candidateStatus(c)} />
+                  <span className="mobile-cell-label" aria-hidden="true">진행 상태</span><CandidateStatusBadge status={candidateStatus(c)} />
                 </td>
-                <td className="min-w-[180px] px-5 py-4">
+                <td className="min-w-[180px] px-5 py-4"><span className="mobile-cell-label" aria-hidden="true">출근일</span>
                   {c.actualJoin ? <><p className="font-semibold">{formatDateOnly(c.actualJoin)}</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : ['최종합격', '입사확정'].includes(candidateStatus(c)) ? <><p className="font-semibold">전화로 협의</p><p className="mt-1 text-sm text-slate-500">08시 30분</p></> : '—'}
                 </td>
-                <td className="px-5 py-4">
+                <td className="candidate-actions px-5 py-4">
                   <div className="flex flex-wrap gap-2">
                     <button
                       className="btn-secondary"
                       onClick={() => setEditing(c)}
                     >
-                      상세 / 수정
+                      {readOnly ? '상세 보기' : '상세 / 수정'}
                     </button>
                     <button className="btn-secondary" onClick={() => setHistoryId(c.id)}>진행 이력</button>
                     {!c.excelMissing && ['최종합격', '입사확정'].includes(candidateStatus(c)) && <button className="btn-primary" onClick={() => setAcceptanceId(c.id)}>합격 안내문</button>}
@@ -225,7 +225,7 @@ export default function Page() {
                       className="btn-secondary"
                       href={'/interviews?candidate=' + c.id}
                     >
-                      면접 관리
+                      {readOnly ? '면접 보기' : '면접 관리'}
                     </Link>
                   </div>
                 </td>

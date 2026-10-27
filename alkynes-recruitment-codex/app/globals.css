@@ -260,3 +260,54 @@ main .card h2:not(.metric-label),.calendar-panel h2 { font-size:18px; line-heigh
   .calendar-panel .calendar-day > span:first-child { font-size:12px; }
   .calendar-panel .calendar-holiday { font-size:9px; line-height:12px; word-break:break-all; }
 }
+
+/* Session controls stay after the page content and diagnostics, never over the board. */
+.mobile-session-footer { margin-top:20px; padding:18px; border:1px solid #c8d3c1; border-radius:12px; background:#e9f0e4; color:#3f5949; }
+.mobile-session-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:end; gap:10px; margin-top:12px; }
+.mobile-session-actions .btn-secondary { width:100%; min-height:44px; }
+.mobile-cell-label { display:none; }
+.mobile-diagnostics { border:1px solid #d8d0bf; border-radius:10px; background:#fffdf780; padding:14px; }
+.mobile-diagnostics summary { min-height:28px; line-height:28px; }
+@media(max-width:767px) {
+  main { min-width:0; padding:16px 14px calc(24px + env(safe-area-inset-bottom)) !important; }
+  .sidebar.is-readonly { padding:12px 14px !important; }
+  .sidebar.is-readonly > div:first-child { margin-bottom:12px; }
+  .sidebar.is-readonly nav { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; overflow:visible; padding:0; }
+  .sidebar.is-readonly .nav-item { flex-direction:column; justify-content:center; gap:4px; min-height:56px; margin:0; padding:7px 4px; font-size:13px; line-height:1.4; }
+  .sidebar.is-readonly .brand-title { font-size:24px; }
+  main > .space-y-6 > h1,main h1.text-2xl { font-size:26px; line-height:1.35; }
+  main p,main h1,main h2,main h3 { word-break:keep-all; overflow-wrap:anywhere; }
+  main .field { max-width:100%; min-height:46px; font-size:16px; }
+  main .btn,main .btn-primary,main .btn-secondary { min-height:44px; }
+  .dashboard-hero { padding:20px; gap:16px; }
+  .dashboard-hero h1 { font-size:30px; }
+  .dashboard-hero .intro { font-size:15px; line-height:1.8; }
+  .metric-paper:last-child { grid-column:auto; }
+  .metric-note { min-height:150px; padding:15px 13px; }
+  .metric-note .metric-label { line-height:1.55; font-weight:800; }
+  .metric-note .metric-value { font-size:36px; }
+  .metric-note .metric-caption { color:#5d584f; }
+  .segmented { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; gap:5px; }
+  .segmented button { min-height:44px; padding:9px 6px; }
+  .segmented span { margin-left:5px; }
+  dialog[open] { width:calc(100% - 24px); max-height:90dvh; }
+  dialog .modal-header { position:sticky; top:0; z-index:5; padding:14px 16px; background:var(--paper); }
+  dialog .modal-header h2 { font-size:19px; line-height:1.4; }
+  dialog .modal-body { padding:16px; }
+  .mobile-session-footer { padding:16px; }
+  /* Calendar cell text remains compact; only general controls use larger touch targets. */
+  .calendar-panel .field { font-size:14px; }
+}
+@media(max-width:639px) {
+  .candidates-table { display:block; width:100%; white-space:normal; }
+  .candidates-table thead { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .candidates-table tbody { display:grid; gap:14px; padding:12px; }
+  .candidates-table tbody tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 12px; padding:16px; border:1px solid #d8d0bf !important; border-radius:10px; background:#fffdf7; }
+  .candidates-table td { display:block; min-width:0 !important; max-width:none; padding:0; white-space:normal; overflow-wrap:anywhere; line-height:1.65; }
+  .candidates-table td.candidate-name { grid-column:1/-1; font-size:20px; line-height:1.4; }
+  .candidates-table td.candidate-job { grid-column:1/-1; padding-bottom:12px; border-bottom:1px solid #e4dece; }
+  .candidates-table td.candidate-actions { grid-column:1/-1; padding-top:12px; border-top:1px solid #e4dece; }
+  .candidate-actions > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .candidate-actions .btn-secondary,.candidate-actions .btn-primary { padding:9px 5px; font-size:14px; white-space:normal; }
+  .mobile-cell-label { display:block; margin-bottom:4px; font-size:12px; font-weight:700; color:#746e62; }
+}

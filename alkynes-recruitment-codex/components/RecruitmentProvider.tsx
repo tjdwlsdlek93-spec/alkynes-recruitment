@@ -14,7 +14,7 @@ import {
   type RecruitmentData,
 } from '@/lib/recruitment';
 import { dataPatch, applyPatch, type EntityPatch } from '@/lib/data-operations';
-import { MobileRefresh } from './MobileRefresh';
+import { MobileSessionFooter } from './MobileSessionFooter';
 import { removeLegacySamples } from '@/lib/recruitment-view';
 type Mode = 'loading' | 'sqlite' | 'browser';
 type Snapshot = {
@@ -383,7 +383,6 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         replace,
       }}
     >
-      {readOnly && <div role="status" className="mb-4 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm"><span>노트북 데이터 · 읽기 전용</span><MobileRefresh /><form action="/__alkynes/mobile/logout" method="post" className="mt-2"><button className="btn-secondary text-xs">접속 종료</button></form></div>}
       {backupWarning && <div role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">DB 저장은 유지되지만 {backupWarning}. 설정에서 백업 폴더를 확인해 주세요.</div>}
       {error && (
         <div
@@ -404,7 +403,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
       {ready ? (
         children
       ) : (
-        <p role="status">노트북 저장소를 확인하는 중입니다…</p>
+        <><p role="status">노트북 저장소를 확인하는 중입니다…</p><MobileSessionFooter readOnly={readOnly}/></>
       )}
     </Context.Provider>
   );

@@ -3,13 +3,14 @@ import { SyncHealth, useSyncHealth } from './SyncHealth';
 import { useState } from 'react';
 import { screenVersion, useAppVersion } from '@/lib/app-version';
 import { copyText } from '@/lib/clipboard';
+import { MobileSessionFooter } from './MobileSessionFooter';
 import { useRecruitment } from './RecruitmentProvider';
 export function AppDiagnostics() {
   const sync = useSyncHealth();
   const { version, outdated } = useAppVersion();
   const { readOnly, storage, data, dataRevision } = useRecruitment();
   const [message, setMessage] = useState('');
-  return <footer aria-label="앱 버전 및 진단" className="mt-8 space-y-2 border-t border-stone-300 pt-4 text-xs text-slate-500">
+  const content=<>
     <p>현재 화면 버전 {screenVersion || '확인 불가'}</p>
     <p>노트북 앱 버전 {version || '연결 확인 중'}</p>
     {version && <p className={outdated ? 'font-semibold text-amber-800' : ''}>{outdated ? '화면 갱신 필요' : '화면·서버 버전 일치'}</p>}
@@ -20,5 +21,7 @@ export function AppDiagnostics() {
       catch { setMessage(details); }
     }}>진단정보 복사</button>
     {message && <p role="status" className="whitespace-pre-wrap break-all">{message}</p>}
-  </footer>;
+  </>;
+  const diagnostics=readOnly ? <details aria-label="앱 버전 및 진단" className="mobile-diagnostics mt-8 text-xs text-slate-500"><summary className="cursor-pointer font-semibold">앱 버전 · 연결 정보</summary><div className="mt-3 space-y-2">{content}</div></details> : <footer aria-label="앱 버전 및 진단" className="mt-8 space-y-2 border-t border-stone-300 pt-4 text-xs text-slate-500">{content}</footer>;
+  return <>{diagnostics}<MobileSessionFooter readOnly={readOnly}/></>;
 }

@@ -33,7 +33,7 @@ export function Modal({
       onCancel={onClose}
       className="w-[calc(100%-2rem)] max-w-2xl max-h-[90vh] rounded-2xl border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-950/40"
     >
-      <div className="flex items-center justify-between border-b p-5">
+      <div className="modal-header flex items-center justify-between gap-3 border-b p-5">
         <h2 className="text-xl font-bold">{title}</h2>
         <button
           type="button"
@@ -44,7 +44,7 @@ export function Modal({
           닫기
         </button>
       </div>
-      <div className="p-5">
+      <div className="modal-body p-5">
         {error && (
           <p role="alert" className="mb-4 text-sm text-red-700">
             {error}
