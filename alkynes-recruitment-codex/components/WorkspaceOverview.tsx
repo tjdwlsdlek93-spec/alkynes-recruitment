@@ -1,15 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRecruitment } from './RecruitmentProvider';
 import { formatDate, formatDateOnly } from '@/lib/recruitment';
 import { todayWork, interviewConflicts } from '@/lib/workspace';
 import { koreaDate } from '@/lib/scheduling';
 import { changeSummary, groupExcelRuns } from '@/lib/excel-changes';
-export function TodayWork() {
+export function TodayWork({ now }: { now: number }) {
   const { data } = useRecruitment();
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(timer); }, []);
   const items = todayWork(data, now), conflicts = interviewConflicts(data, now);
   const pending = items.length > 0 || conflicts.length > 0;
   return <section className={'card desk-note todo-note p-5' + (pending ? ' has-work' : '')} aria-label="오늘 챙길 일">

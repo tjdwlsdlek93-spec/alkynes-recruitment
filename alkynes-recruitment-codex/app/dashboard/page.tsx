@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { activeInterview, interviewGroup } from '@/lib/interview-state';
 import { endedCandidate } from '@/lib/candidate-state';
 import { useRecruitment } from '@/components/RecruitmentProvider';
@@ -11,10 +12,12 @@ import { formatDate, formatDateOnly } from '@/lib/recruitment';
 import { closedJob, requestedPeople, latestRequest } from '@/lib/recruitment-view';
 export default function Dashboard() {
   const { data } = useRecruitment();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => { const refresh = () => setNow(Date.now()); const timer = setInterval(refresh, 60000); window.addEventListener('focus', refresh); document.addEventListener('visibilitychange', refresh); return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); }; }, []);
   const today = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Seoul',
     dateStyle: 'short',
-  }).format(new Date());
+  }).format(new Date(now));
   const start = new Date(today + 'T00:00:00+09:00');
   const day = new Date(today + 'T00:00:00Z').getUTCDay();
   start.setUTCDate(start.getUTCDate() - ((day + 6) % 7));
@@ -26,16 +29,17 @@ export default function Dashboard() {
   ).sort((a, b) => latestRequest(data, b.id).localeCompare(latestRequest(data, a.id)));
   const thisWeek = data.interviews.filter(
     (i) =>
-      activeInterview(data, i) && ['scheduled','review'].includes(interviewGroup(data,i)) &&
+      activeInterview(data, i) && ['scheduled','review'].includes(interviewGroup(data,i,now)) &&
       new Date(i.startsAt) >= start &&
       new Date(i.startsAt) < end,
   );
+  const otherWeekInterviews = thisWeek.filter(i => koreaDate(i.startsAt) !== today);
   const month = today.slice(0, 7);
   return (
     <div className="space-y-6">
       <header className="dashboard-hero">
         <div><span className="board-eyebrow">ALKYNES · RECRUITMENT BOARD</span><h1>채용 현황</h1><p className="intro"><strong>오늘의 채용, 어디까지 왔을까요?</strong><br/>진행 중인 일정과 지원자를 확인해보세요.</p></div>
-        <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date())}</strong><small>나만의 채용 아지트</small></div>
+        <div className="board-date"><span className="board-eyebrow">TODAY</span><strong>{new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'long', day:'numeric', weekday:'short' }).format(new Date(now))}</strong><small>나만의 채용 아지트</small></div>
       </header>
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {[
@@ -51,7 +55,7 @@ export default function Dashboard() {
         ].map(([k, v], index) => (
           <div className="metric-paper" key={String(k)}><div className="card metric-note">
             <h2 className="metric-label">{k}</h2>
-            <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '종료된 전형 제외', '이번 달 실제 입사일 기준'][index]}</p>
+            <div className="metric-value">{v}<span className="ml-1 text-sm font-medium">{index === 0 || index === 2 ? '건' : '명'}</span></div><p className="metric-caption">{['진행중인 채용공고', '진행중 채용 · 중복 인원 제외', '오늘 포함 · 종료된 전형 제외', '이번 달 실제 입사일 기준'][index]}</p>
             <svg className="metric-fold" viewBox="0 0 30 30" aria-hidden="true">
               <path d="M1 1L29 29H5Q1 29 1 25Z" fill="#35322c" opacity=".18" transform="translate(-2 3)"/>
               <path d="M1 1L29 29H5Q1 29 1 25Z" fill="var(--fold-color)" stroke="var(--ink)" strokeWidth="1.6" strokeLinejoin="round"/>
@@ -60,10 +64,10 @@ export default function Dashboard() {
           </div></div>
         ))}
       </div>
-      <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside"><TodayWork />
+      <div className="dashboard-board"><RecruitmentCalendar /><aside className="dashboard-aside"><TodayWork now={now} />
       <div className="card week-note p-5">
-        <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접</h2>
-        {thisWeek.map((i) => {
+        <span className="section-label">THIS WEEK</span><h2 className="mb-3 text-sm font-bold">이번주 면접</h2><p className="mb-3 text-xs text-slate-500">오늘 면접은 오늘 챙길 일에서 확인하세요.</p>
+        {otherWeekInterviews.map((i) => {
           const person = data.candidates.find(c => c.id === i.candidateId);
           const job = data.requisitions.find(r => r.id === person?.requisitionId);
           return <Link
@@ -76,7 +80,7 @@ export default function Dashboard() {
             <p className="break-keep text-xs leading-5 text-slate-600">{i.location || '장소 미입력'}</p>
           </Link>;
         })}
-        {!thisWeek.length && <Empty>이번 주 예정된 면접이 없습니다.</Empty>}
+        {!otherWeekInterviews.length && <Empty>오늘을 제외한 이번 주 면접이 없습니다.</Empty>}
       </div>
         <div className="card desk-note p-5"><span className="board-eyebrow">BOARD MEMO</span><h2 className="mt-3 font-bold">이렇게 확인하세요</h2><ul className="mt-4 space-y-3 text-xs leading-6 text-slate-600"><li>· 엑셀 저장 후 좌측의 <strong>엑셀 업데이트</strong>를 누르면 바로 반영됩니다.</li><li>· 입사포기·지원포기 등 종료된 전형은 진행중 집계에서 제외합니다.</li><li>· 인적성·면접 화면에서 카톡 안내문을 작성하고 복사할 수 있습니다.</li></ul></div>
       </aside></div>
@@ -112,8 +116,8 @@ export default function Dashboard() {
                 .filter(
                   (i) =>
                     activeInterview(data, i) && ids.includes(i.candidateId) &&
-                    ['scheduled','review'].includes(interviewGroup(data,i)) &&
-                    Date.parse(i.startsAt) >= Date.now(),
+                    ['scheduled','review'].includes(interviewGroup(data,i,now)) &&
+                    Date.parse(i.startsAt) >= now,
                 )
                 .sort(
                   (a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt),

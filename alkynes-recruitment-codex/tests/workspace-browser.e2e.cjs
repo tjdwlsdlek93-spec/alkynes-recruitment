@@ -30,6 +30,9 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await refresh();let saved=await api();assert.equal(saved.data.interviews.length,2);assert.equal(saved.data.excelRuns.length,1);
     const todo = page.getByLabel('오늘 챙길 일',{exact:true});
     await todo.getByText('오늘 면접',{exact:true}).first().waitFor();
+    assert.equal(await page.locator('.week-note a').count(),0);await page.locator('.week-note').getByText('오늘을 제외한 이번 주 면접이 없습니다.',{exact:true}).waitFor();
+    await page.clock.setSystemTime(new Date('2026-10-21T10:00:00+09:00'));await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelectorAll('.week-note a').length===2);
+    await page.clock.setSystemTime(new Date('2026-10-22T10:00:00+09:00'));await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelectorAll('.week-note a').length===0);
     assert.equal(await page.getByLabel('엑셀 변경 내역',{exact:true}).count(),0);
     for(const width of [1440,1280]) {
       await page.setViewportSize({width,height:1100});
