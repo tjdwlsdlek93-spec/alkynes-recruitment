@@ -43,7 +43,7 @@ test('updater checks GitHub releases, verifies checksum and stages only allowed 
   await fs.mkdir(dataDir); await fs.writeFile(path.join(dataDir, 'excel-source.json'), 'keep');
   await fs.writeFile(path.join(root, 'version.json'), JSON.stringify({ app: 'alkynes-recruitment', version: '2026.10.14.4' }));
   const current = '2026.10.14.5', app = 'alkynes-recruitment';
-  const names = ['server.cjs', 'excel-source.cjs', 'update.cjs', 'update-worker.cjs', 'setup.cjs', 'version.json', 'site/dashboard.html', 'site/settings.html'];
+  const names = ['server.cjs', 'excel-source.cjs', 'update.cjs', 'update-worker.cjs', 'setup.cjs', 'version.json', 'site/dashboard.html', 'site/settings.html', 'site/_server/native-services.cjs'];
   let bundle = zlib.gzipSync(JSON.stringify({ app, version: current, files: names.map(name => ({ name, content: Buffer.from(name === 'version.json' ? JSON.stringify({ app, version: current }) : 'app content').toString('base64') })) }));
   const manifest = { app, version: current, sha256: crypto.createHash('sha256').update(bundle).digest('hex') };
   let corrupt = true, spawned = 0, stopped = 0;
@@ -92,6 +92,7 @@ test('update worker restarts the app and restores the previous version when repl
       const savedDb = new DatabaseSync(path.join(dataDir, 'recruitment.sqlite'));
       savedDb.exec("CREATE TABLE preserved(payload TEXT); INSERT INTO preserved VALUES ('private recruitment records');"); savedDb.close();
       await fs.mkdir(path.join(stage, 'site'), { recursive: true });
+      for(const target of [path.join(root,'site','_server'),path.join(stage,'site','_server')]) await fs.cp(path.resolve(__dirname,'../public/_server'),target,{recursive:true});
       for (const name of ['server.cjs', 'excel-source.cjs', 'update.cjs', 'update-worker.cjs', 'setup.cjs', 'version.json']) await fs.copyFile(path.join(root, name), path.join(stage, name));
       await fs.writeFile(path.join(stage, 'version.json'), JSON.stringify({ app: 'alkynes-recruitment', version: '2026.10.14.5' }));
       if (fail) await fs.rm(path.join(stage, 'server.cjs'));

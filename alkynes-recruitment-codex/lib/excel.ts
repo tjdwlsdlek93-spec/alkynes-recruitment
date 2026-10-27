@@ -1,4 +1,5 @@
 import { formatDate } from './recruitment';
+import { qualityIssues, type QualityIssue } from './excel-integrity';
 import { excelChanges } from './excel-changes';
 import { candidateStatus, finalStatus } from './candidate-state';
 import type { CellValue } from 'exceljs';
@@ -11,6 +12,7 @@ import type {
 } from './recruitment';
 
 export type ExcelPlan = {
+  qualityIssues?: QualityIssue[];
   jobs: Requisition[];
   candidates: Candidate[];
   requests: ProcessRequest[];
@@ -150,6 +152,8 @@ export async function parseExcel(
     return columns[0] || 0;
   };
   const locationColumn = optionalColumn(['면접장소']), interviewerColumn = optionalColumn(['면접관', '면접관명']);
+  const jobIdColumn=optionalColumn(['채용고유번호','채용ID']), personIdColumn=optionalColumn(['지원자고유번호','지원자ID']), requestIdColumn=optionalColumn(['요청고유번호','요청ID']), interviewIdColumn=optionalColumn(['면접고유번호','면접ID']);
+  const explicit = (row: import('exceljs').Row, col: number, prefix: string) => { const value=col?text(row.getCell(col).value):''; if(!value)return ''; if(!new RegExp('^'+prefix+'-[a-zA-Z0-9-]{8,100}$').test(value))throw Error(row.number+'행 고유번호 형식을 확인해 주세요. 앱에서 내려받은 번호를 사용하세요.'); return value; };
   const businessDays = Number(
     unwrap(book.getWorksheet('채용프로세스 요약')?.getCell('B11').value ?? 1),
   );
@@ -158,7 +162,7 @@ export async function parseExcel(
   const warnings = [
     '원본 파일은 수정하지 않습니다. 수식은 실행하지 않으며 입력값과 저장된 수식 결과를 읽습니다.',
     '시간이 없는 날짜는 시각을 추정하지 않습니다. 달력에서 일자만 표시합니다.',
-    '동일 채용건·동일 이름을 한 지원자로 연결합니다. 동명이인은 엑셀에서 구분해 주세요.',
+    '고유번호가 없으면 동일 채용건·동일 이름을 한 지원자로 연결합니다. 동명이인은 지원자 고유번호로 구분해 주세요.',
     '날짜가 지난 일정도 면접완료로 추정하지 않습니다. 원본 선발 단계와 확인 필요 메모를 보존합니다.',
     '다시 가져오기는 같은 식별 키를 갱신합니다. 파일에서 삭제한 행은 앱에서 자동 삭제하지 않습니다.',
   ];
@@ -196,7 +200,8 @@ export async function parseExcel(
       stage = text(v(5));
     if (!['채용 공고 등록', '인적성 검사 요청', '면접 요청'].includes(stage))
       throw Error(n + '행의 요청 구분을 확인해 주세요: ' + stage);
-    const jobId = await key('excel-job', [title, department]);
+    const jobId = explicit(row,jobIdColumn,'excel-job') || await key('excel-job', [title, department]);
+    if(jobMap.has(jobId) && (jobMap.get(jobId)!.role!==title || jobMap.get(jobId)!.department!==department))throw Error(n+'행 채용 고유번호가 다른 채용건과 중복됩니다.');
     if (!jobMap.has(jobId)) {
       const closed = stateMap.get(title);
       jobMap.set(jobId, {
@@ -245,7 +250,8 @@ export async function parseExcel(
       .filter(Boolean)
       .join(' · ');
     if (name) {
-      candidateId = await key('excel-person', [jobId, name]);
+      candidateId = explicit(row,personIdColumn,'excel-person') || await key('excel-person', [jobId, name]);
+      if(candidateMap.has(candidateId) && (candidateMap.get(candidateId)!.name!==name || candidateMap.get(candidateId)!.requisitionId!==jobId))throw Error(n+'행 지원자 고유번호가 다른 지원자와 중복됩니다.');
       const old = candidateMap.get(candidateId);
       const known = [
         '검토중',
@@ -298,7 +304,8 @@ export async function parseExcel(
     const roundKey = JSON.stringify(group.slice(0, 3)),
       stageRound = (roundGroups.get(roundKey) || 0) + 1;
     roundGroups.set(roundKey, stageRound);
-    const id = await key('excel-request', [...group, String(round)]);
+    const id = explicit(row,requestIdColumn,'excel-request') || await key('excel-request', [...group, String(round)]);
+    if(plan.requests.some(q=>q.id===id))throw Error(n+'행 요청 고유번호가 중복됩니다. 새 요청이면 복사한 요청 고유번호 셀을 비워 주세요.');
     const dateValues: Record<number, string> = { 6: receivedAt, 7: completedAt, 8: cachedDue, 10: examAt, 11: interviewAt, 14: expectedJoin, 15: actualJoin };
     const excelValues = Object.fromEntries(headers.map((header, index) => [header, index + 1 in dateValues ? (dateValues[index + 1] ? formatDate(dateValues[index + 1]) : '') : text(v(index + 1))]));
     if (locationColumn) excelValues['면접장소'] = text(row.getCell(locationColumn).value);
@@ -307,6 +314,7 @@ export async function parseExcel(
       ...stamp(id),
       source: 'kpi-excel',
       sourceRow: n,
+      explicitId: !!(requestIdColumn && text(row.getCell(requestIdColumn).value)),
       excelValues,
       verification,
       requisitionId: jobId,
@@ -328,17 +336,21 @@ export async function parseExcel(
           '행: 요청일 미입력 — 요청을 보존하며 달력 접수일에는 표시하지 않습니다.',
       );
     if (interviewAt && candidateId) {
-      const iid = await key('excel-interview', [candidateId, interviewAt]);
+      const explicitId=explicit(row,interviewIdColumn,'excel-interview');
+      const iid = explicitId || await key('excel-interview', [candidateId, interviewAt]);
       const completed =
         ['면접완료', '처우협의', '최종합격', '입사확정', '실제 입사'].includes(
           current,
         ) || !!actualJoin;
       const previous = interviewMap.get(iid);
+      if(previous && (previous.candidateId!==candidateId || previous.startsAt!==interviewAt))throw Error(n+'행 면접 고유번호가 다른 일정과 중복됩니다. 새 면접이면 복사한 면접 고유번호 셀을 비워 주세요.');
       const location = locationColumn ? text(row.getCell(locationColumn).value) : '';
       const interviewers = interviewerColumn ? [...new Set(text(row.getCell(interviewerColumn).value).split(/[,，;；\r\n]+/).map(name => name.trim()).filter(Boolean))] : [];
       interviewMap.set(iid, {
         ...stamp(iid),
         source: 'kpi-excel',
+        sourceRequestId: id,
+        explicitId: !!explicitId,
         verification:
           verification ||
           (!completed ? '원본에서 면접 완료 여부를 확인해 주세요.' : ''),
@@ -372,15 +384,18 @@ export async function parseExcel(
   plan.jobs = [...jobMap.values()];
   plan.candidates = [...candidateMap.values()];
   plan.interviews = [...interviewMap.values()];
+  for(const interview of plan.interviews) {const c=candidateMap.get(interview.candidateId);if(c && interview.status!=='취소' && ['면접완료','처우협의','최종합격','입사확정','실제 입사'].includes(candidateStatus(c)))interview.status='면접완료';}
   warnings.push(
     '불분명한 메모 ' +
       plan.requests.filter((q) => q.verification).length +
       '건은 확인 필요 표시로 남깁니다.',
   );
+  plan.qualityIssues = qualityIssues(plan);
+  plan.warnings.push(...plan.qualityIssues.map(issue=>issue.row+'행 '+issue.field+': '+issue.message));
   return plan;
 }
 export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
-  const upsert = <T extends { id: string; createdAt: string }>(
+  const upsert = <T extends { id: string; createdAt: string; updatedAt: string }>(
     rows: T[],
     next: T[],
     merge = false,
@@ -388,12 +403,12 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
     for (const item of next) {
       const index = rows.findIndex((r) => r.id === item.id);
       if (index < 0) rows.push(structuredClone(item));
-      else
-        rows[index] = {
-          ...(merge ? rows[index] : {}),
-          ...structuredClone(item),
-          createdAt: rows[index].createdAt,
-        };
+      else {
+        const previous = rows[index];
+        const next = { ...(merge ? previous : {}), ...structuredClone(item), createdAt: previous.createdAt } as T;
+        const unchanged = JSON.stringify({ ...previous, createdAt: '', updatedAt: '' }) === JSON.stringify({ ...next, createdAt: '', updatedAt: '' });
+        rows[index] = { ...next, updatedAt: unchanged ? previous.updatedAt : next.updatedAt };
+      }
     }
   };
   const year = new Intl.DateTimeFormat('en', {
@@ -424,6 +439,7 @@ export function applyExcelPlan(data: RecruitmentData, plan: ExcelPlan) {
           email: old.email,
           resumeName: old.resumeName,
           resumeData: old.resumeData,
+          resumeId: old.resumeId,
           career: old.career,
           appNotes: old.appNotes,
         }

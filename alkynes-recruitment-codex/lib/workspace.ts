@@ -30,7 +30,7 @@ export function markNotice(data: RecruitmentData, target: NoticeTarget, audience
   }
 }
 export function interviewConflicts(data: RecruitmentData, now = Date.now()) {
-  const rows = data.interviews.filter(i => activeInterview(data, i) && i.status !== '면접완료' && Date.parse(i.startsAt) + (i.durationMinutes || 60) * 60000 > now);
+  const rows = data.interviews.filter(i => activeInterview(data, i) && interviewGroup(data,i,now) !== 'completed' && Date.parse(i.startsAt) + (i.durationMinutes || 60) * 60000 > now);
   const conflicts: { first: Interview; second: Interview; reasons: string[] }[] = [];
   const normalize = (value: string) => value.replace(/\s+/g, '').toLowerCase();
   for (let a = 0; a < rows.length; a++) for (let b = a + 1; b < rows.length; b++) {
@@ -53,7 +53,7 @@ export function todayWork(data: RecruitmentData, now = Date.now()): WorkItem[] {
     return !!job && !job.excelMissing && !closedJob(job) && (!id || (!!c && !c.excelMissing && !endedCandidate(c)));
   };
   const person = (id: string) => data.candidates.find(c => c.id === id)?.name || '공통 요청';
-  for (const i of data.interviews.filter(i => activeInterview(data, i) && i.status !== '면접완료')) {
+  for (const i of data.interviews.filter(i => activeInterview(data, i) && interviewGroup(data,i,now) !== 'completed')) {
     const href = '/interviews?candidate=' + encodeURIComponent(i.candidateId), group = interviewGroup(data, i, now);
     if (group === 'review') result.push({ id: 'review-' + i.id, title: '면접 결과 확인', detail: person(i.candidateId), at: i.startsAt, href, urgent: true });
     else if (koreaDate(i.startsAt) === today) result.push({ id: 'today-' + i.id, title: '오늘 면접', detail: person(i.candidateId) + ' · ' + i.location, at: i.startsAt, href, urgent: false });

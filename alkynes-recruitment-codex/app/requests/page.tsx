@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
+import { SyncHealth } from '@/components/SyncHealth';
 import { ExcelChangeHistory } from '@/components/WorkspaceOverview';
 import { ExcelSyncControls } from '@/components/ExcelSync';
 import { useRecruitment } from '@/components/RecruitmentProvider';
@@ -14,6 +15,7 @@ import {
   download,
   type ProcessRequest,
 } from '@/lib/recruitment';
+import { stabilizePlan } from '@/lib/excel-integrity';
 import { excelChanges } from '@/lib/excel-changes';
 import { defaultDueDate, requestTiming, requestsCSV } from '@/lib/scheduling';
 import {
@@ -172,7 +174,8 @@ export default function Page() {
           </button>
         </div>
       </div>
-      <ExcelSyncControls /><ExcelChangeHistory />
+      <ExcelSyncControls />
+      <SyncHealth /><ExcelChangeHistory />
       <div className="card space-y-3 p-5">
         <h2 className="font-bold">엑셀 파일 직접 가져오기</h2>
         <p className="text-sm text-slate-600">
@@ -488,7 +491,7 @@ export default function Page() {
                       d.requests = [];
                     }
                     const before = structuredClone(d);
-                    applyExcelPlan(d, plan);
+                    applyExcelPlan(d, stabilizePlan(structuredClone(plan), d));
                     const run = excelChanges(before, d, plan.sourceName);
                     if (plan.sourceModifiedAt) run.sourceModifiedAt = plan.sourceModifiedAt;
                     if (run.changes.length || !d.excelRuns?.length) d.excelRuns = [run, ...(d.excelRuns || [])];

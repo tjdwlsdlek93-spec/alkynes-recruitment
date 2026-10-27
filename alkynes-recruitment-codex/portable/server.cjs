@@ -311,15 +311,16 @@ function createMobileHandler({ host, localPort, passwordHash, salt }) {
     if (name === '/__alkynes/source') return send(res,200,JSON.stringify({path:'',enabled:false}),'application/json');
     const data = name === '/__alkynes/data';
     const pages = ['/', '/dashboard','/candidates','/requisitions','/aptitudes','/interviews','/evaluations'];
-    const allowed = data || name === '/__alkynes/health' || pages.some(p => name === p || (p!=='/' && name === p+'.txt')) || name.startsWith('/_next/static/') || /^\/(fonts|images)\//.test(name) || name === '/favicon.ico';
+    const allowed = data || name === '/__alkynes/sync' || /^\/__alkynes\/attachments\/[a-f0-9]{64}$/.test(name) || name === '/__alkynes/health' || pages.some(p => name === p || (p!=='/' && name === p+'.txt')) || name.startsWith('/_next/static/') || /^\/(fonts|images)\//.test(name) || name === '/favicon.ico';
     if (!allowed || name.includes('..') || name.includes('\\') || name.includes('\0')) return send(res,403,'휴대폰 조회에서 사용할 수 없는 기능입니다.');
-    const upstream = http.request({hostname:'127.0.0.1',port:localPort,path:req.url,method:'GET',headers:{Host:'127.0.0.1:'+localPort,'X-Alkynes-Client':'1',...(req.headers.rsc==='1'?{RSC:'1'}:{})},timeout:15000}, response => {
+    const upstream = http.request({hostname:'127.0.0.1',port:localPort,path:req.url,method:'GET',headers:{Host:'127.0.0.1:'+localPort,'X-Alkynes-Client':'1','X-Alkynes-Compact':'1',...(req.headers['if-none-match']?{'If-None-Match':req.headers['if-none-match']}:{}),...(req.headers.rsc==='1'?{RSC:'1'}:{})},timeout:15000}, response => {
+      if (data && response.statusCode===304) { response.resume(); return send(res,304,''); }
       if (data) {
         const chunks=[];response.on('data',c=>chunks.push(c));response.on('end',()=>{
           try {
             const body = JSON.parse(Buffer.concat(chunks));
             if(response.statusCode!==200 || body.storage!=='sqlite') return send(res,503,'노트북 데이터를 읽지 못했습니다.');
-            send(res,200,JSON.stringify({data:body.data,revision:body.revision,updatedAt:body.updatedAt,storage:'sqlite',readOnly:true,databasePath:''}),'application/json');
+            send(res,200,JSON.stringify({data:body.data,revision:body.revision,updatedAt:body.updatedAt,storage:'sqlite',readOnly:true,databasePath:'',storageModel:body.storageModel}),'application/json',{ETag:'\"'+body.revision+'\"'});
           } catch { send(res,503,'노트북 데이터를 읽지 못했습니다.'); }
         });
       } else {
@@ -398,12 +399,9 @@ function startServer() {
       setTimeout(() => process.exit(0), 2000).unref();
     },
   });
-  const handleData = createDataHandler({
-    port,
-    dataDir: process.env.ALKYNES_DATA_DIR || path.join(__dirname, 'config'),
-    validate: (value) =>
-      require(path.join(root, '_server/recruitment.cjs')).validateData(value),
-  });
+  const services = require(path.join(root, '_server/native-services.cjs'));
+  const dataDir = process.env.ALKYNES_DATA_DIR || path.join(__dirname, 'config');
+  let store, handleData, sync;
   const handleMobile = createMobileAccess({ port, dataDir: process.env.ALKYNES_DATA_DIR || path.join(__dirname, 'config') });
   const stopFile = path.join(__dirname, '.stop-request');
   const types = {
@@ -433,7 +431,16 @@ function startServer() {
       return reply(res, 400, 'Bad request');
     }
     if (name === '/__alkynes/mobile') { void handleMobile(req, res); return; }
-    if (name.startsWith('/__alkynes/data')) {
+    if (['/__alkynes/sync','/__alkynes/sync/force','/__alkynes/source/identified'].includes(name)) {
+      const hosts = ['127.0.0.1:'+port,'localhost:'+port];
+      if (!hosts.includes(req.headers.host) || req.headers['x-alkynes-client']!=='1' || (req.headers.origin && !hosts.map(h=>'http://'+h).includes(req.headers.origin))) return reply(res,403,'Forbidden');
+      if ((name.endsWith('/force') && req.method!=='POST') || (!name.endsWith('/force') && req.method!=='GET')) return reply(res,405,'Method not allowed');
+      void (async()=>{try {
+        if(name.endsWith('/identified')) { const content=await sync.identifiedCopy(); res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Cache-Control':'no-store'});return res.end(content); }
+        const status=name.endsWith('/force')?await sync.run(true):sync.status();res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...status,background:true}));
+      } catch(e) {res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:e.message}));}})(); return;
+    }
+    if (name.startsWith('/__alkynes/data') || name.startsWith('/__alkynes/attachments/')) {
       void handleData(req, res, name);
       return;
     }
@@ -492,12 +499,22 @@ function startServer() {
       reply(res, 404, 'Not found');
     }
   });
-  server.on('close', () => { handleMobile.close(); handleData.close(); });
+  server.on('close', () => { sync?.close(); handleMobile.close(); store?.close(); });
   server.on('error', (error) => {
+    handleMobile.close();
     console.error('채용관리 서버를 시작하지 못했습니다:', error.message);
     process.exitCode = 1;
   });
   server.listen(port, '127.0.0.1', () => {
+    try {
+      // Claim the application port before opening or migrating any existing database.
+      store = services.createEntityStore(dataDir);
+      handleData = services.createStorageHandler({ store, port });
+      sync = services.createSyncService({ store, source: handleSource, dataDir });
+    } catch (error) {
+      console.error('저장소를 준비하지 못했습니다. 기존 백업을 유지합니다:', error.message);
+      process.exitCode = 1; server.close(); return;
+    }
     console.log('알킨스 채용관리: http://127.0.0.1:' + port);
     if (fs.existsSync(stopFile)) fs.unlinkSync(stopFile);
     fs.watchFile(stopFile, { interval: 500 }, () => {

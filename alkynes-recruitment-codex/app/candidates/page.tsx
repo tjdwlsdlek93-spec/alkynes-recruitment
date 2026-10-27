@@ -69,6 +69,7 @@ export default function Page() {
         notes: editing?.excelStage !== undefined ? editing.notes : value(form, 'notes'),
         appNotes: editing?.excelStage !== undefined ? value(form, 'notes') : editing?.appNotes,
         resumeData,
+        resumeId: form.get('removeResume') || file?.size ? undefined : editing?.resumeId,
         resumeName,
       };
       if (editing?.excelStage !== undefined) Object.assign(fields, { requisitionId: editing.requisitionId, name: editing.name, source: editing.source, status: editing.status });
@@ -252,6 +253,7 @@ export default function Page() {
               {editing.actualJoin ? formatDateOnly(editing.actualJoin) : '미입력'}
             </p>
           )}
+          {editing?.id.startsWith('excel-person-') && <p className="mb-3 break-all text-xs text-slate-500">지원자 고유번호: <span className="select-all">{editing.id}</span></p>}
           {editing && <CandidateTimeline candidateId={editing.id} />}
           {editing?.excelStage !== undefined && <p className="mb-4 text-sm text-slate-500">이름·채용건·진행상태는 엑셀에서 수정합니다. 연락처·이력서·개인 메모는 앱에만 저장합니다.</p>}
           <form onSubmit={save}>
@@ -341,11 +343,11 @@ export default function Page() {
                   accept=".pdf,application/pdf"
                 />
               </Field>
-              {editing?.resumeData && (
+              {(editing?.resumeData || editing?.resumeId) && (
                 <div className="col-span-full space-y-2">
                   <a
                     className="text-sm underline"
-                    href={editing.resumeData}
+                    href={editing.resumeData || '/__alkynes/attachments/' + editing.resumeId}
                     download={editing.resumeName}
                   >
                     이력서 다운로드: {editing.resumeName}

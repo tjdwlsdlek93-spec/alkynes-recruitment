@@ -65,6 +65,7 @@ export type Candidate = Stamped & {
   status: (typeof candidateStatuses)[number];
   notes: string;
   appNotes?: string;
+  resumeId?: string;
   resumeName: string;
   resumeData: string;
 };
@@ -73,6 +74,8 @@ export type Interview = Stamped & {
   startsAt: string;
   location: string;
   interviewers: string[];
+  sourceRequestId?: string;
+  explicitId?: boolean;
   pastInterviewers?: string[];
   durationMinutes?: number;
   appNotes?: string;
@@ -96,6 +99,7 @@ export const requestStages = [
 ] as const;
 export const requestStatuses = ['요청 전', '요청 완료', '취소'] as const;
 export type ProcessRequest = Stamped & {
+  explicitId?: boolean;
   requisitionId: string;
   candidateId: string;
   excelJobId: string;
@@ -490,6 +494,7 @@ export function validateData(value: unknown): value is RecruitmentData {
           'expectedJoin',
           'actualJoin',
           'appNotes',
+          'resumeId',
         ]) &&
         [c.expectedJoin, c.actualJoin].every(
           (v) => !v || Number.isFinite(Date.parse(v)),
@@ -500,7 +505,7 @@ export function validateData(value: unknown): value is RecruitmentData {
               (v) => typeof v === 'string' && Number.isFinite(Date.parse(v)),
             ))),
     ) ||
-    !d.interviews.every((i) => optionalStrings(i, ['source', 'verification', 'appNotes']) && (i.durationMinutes === undefined || (Number.isInteger(i.durationMinutes) && i.durationMinutes >= 5 && i.durationMinutes <= 480)))
+    !d.interviews.every((i) => optionalStrings(i, ['source', 'verification', 'appNotes', 'sourceRequestId']) && (i.explicitId === undefined || typeof i.explicitId === 'boolean') && (i.durationMinutes === undefined || (Number.isInteger(i.durationMinutes) && i.durationMinutes >= 5 && i.durationMinutes <= 480)))
   )
     return false;
   if (

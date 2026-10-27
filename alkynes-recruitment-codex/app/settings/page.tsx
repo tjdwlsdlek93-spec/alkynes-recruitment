@@ -52,14 +52,18 @@ export default function Page() {
         </p>
         <button
           className="btn-primary"
-          onClick={() =>
-            download(
-              'alkynes-backup-' +
-                new Date().toISOString().slice(0, 10) +
-                '.json',
-              JSON.stringify(data, null, 2),
-            )
-          }
+          onClick={async () => {
+            try {
+              let exported = data;
+              if (storage === 'sqlite') {
+                const response = await fetch('/__alkynes/data/export', { headers: { 'X-Alkynes-Client': '1' }, cache: 'no-store' });
+                if (!response.ok) throw Error('전체 백업을 읽지 못했습니다.');
+                exported = (await response.json()).data;
+                if (!validateData(exported)) throw Error('백업 데이터 검증 실패');
+              }
+              download('alkynes-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(exported, null, 2));
+            } catch (e) { setError(e instanceof Error ? e.message : '백업 실패'); }
+          }}
         >
           백업 다운로드
         </button>

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { activeInterview } from '@/lib/interview-state';
+import { activeInterview, interviewGroup } from '@/lib/interview-state';
 import { endedCandidate } from '@/lib/candidate-state';
 import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Empty } from '@/components/Forms';
@@ -26,7 +26,7 @@ export default function Dashboard() {
   ).sort((a, b) => latestRequest(data, b.id).localeCompare(latestRequest(data, a.id)));
   const thisWeek = data.interviews.filter(
     (i) =>
-      activeInterview(data, i) && ['면접예정', '확인 필요'].includes(i.status) &&
+      activeInterview(data, i) && ['scheduled','review'].includes(interviewGroup(data,i)) &&
       new Date(i.startsAt) >= start &&
       new Date(i.startsAt) < end,
   );
@@ -112,7 +112,7 @@ export default function Dashboard() {
                 .filter(
                   (i) =>
                     activeInterview(data, i) && ids.includes(i.candidateId) &&
-                    ['면접예정', '확인 필요'].includes(i.status) &&
+                    ['scheduled','review'].includes(interviewGroup(data,i)) &&
                     Date.parse(i.startsAt) >= Date.now(),
                 )
                 .sort(

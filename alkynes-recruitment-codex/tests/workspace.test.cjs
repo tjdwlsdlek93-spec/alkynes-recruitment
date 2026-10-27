@@ -113,3 +113,15 @@ test('acceptance text contains weekday, fixed start time and office floor, with 
   assert.ok(acceptanceMessage('검증지원자','검증공고','2026-10-22','없음',extra).includes('없음\n\n'+extra+'\n\n문의사항'));
   assert.equal(acceptanceMessage('검증지원자','검증공고','2026-10-22','없음','   '),acceptanceMessage('검증지원자','검증공고','2026-10-22','없음'));
 });
+test('future join dates remain confirmed until the Korean join date and final outcomes resolve interview grouping',()=>{
+  const {candidateStatus}=load('candidate-state'),{interviewGroup}=load('interview-state');
+  const c={status:'면접예정',actualJoin:'2099-01-01T00:00:00+09:00'};
+  assert.equal(candidateStatus(c,'2026-10-27'),'입사확정');assert.equal(candidateStatus(c,'2099-01-01'),'실제 입사');assert.equal(candidateStatus({...c,excelFinal:'입사포기'},'2026-10-27'),'입사포기');
+  const data=fixture();data.candidates[0].excelFinal='최종합격';assert.equal(interviewGroup(data,data.interviews[0],now),'completed');
+  data.candidates[0].excelFinal='지원포기';assert.equal(interviewGroup(data,data.interviews[0],now),'cancelled');
+});
+test('unchanged Excel entities keep their modification time instead of rewriting every record',()=>{
+ const {applyExcelPlan}=load('excel');const data=seedData(),job=data.requisitions[0],person=data.candidates[0];
+ const plan={jobs:[{...job,updatedAt:'2099-01-01T00:00:00Z'}],candidates:[{...person,updatedAt:'2099-01-01T00:00:00Z'}],requests:[],interviews:[],warnings:[],rows:1,businessDays:1,sourceName:'synthetic.xlsx'};
+ applyExcelPlan(data,plan);assert.equal(data.requisitions[0].updatedAt,job.updatedAt);assert.equal(data.candidates[0].updatedAt,person.updatedAt);
+});

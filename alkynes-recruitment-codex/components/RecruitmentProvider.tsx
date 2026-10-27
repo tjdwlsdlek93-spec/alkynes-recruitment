@@ -25,6 +25,7 @@ type Snapshot = {
   readOnly?: boolean;
 };
 type Store = {
+  dataRevision: number;
   readOnly: boolean;
   data: RecruitmentData;
   ready: boolean;
@@ -56,6 +57,7 @@ async function database(
     method: body ? 'POST' : 'GET',
     headers: {
       'X-Alkynes-Client': '1',
+      'X-Alkynes-Compact': '1',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(revision ? { 'If-None-Match': '"' + revision + '"' } : {}),
     },
@@ -88,6 +90,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<RecruitmentData>(empty),
     [ready, setReady] = useState(false),
     [readOnly, setReadOnly] = useState(false),
+    [dataRevision, setDataRevision] = useState(0),
     [notice, setNotice] = useState(''),
     [error, setError] = useState(''),
     [saving, setSaving] = useState(false),
@@ -108,6 +111,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
     state.current.data = next;
     state.current.revision = revision;
     setData(next);
+    setDataRevision(revision);
   }
   function browserData() {
     const raw = localStorage.getItem(storageKey);
@@ -185,7 +189,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
               '/migrate',
             );
             if (!ack) throw Error('이전 결과를 확인하지 못했습니다.');
-            snapshot = { ...ack, data: next };
+            snapshot = { ...ack, data: ack.data || next };
           } catch (e) {
             if (!(e instanceof StorageError) || e.status !== 409) throw e;
             snapshot = await database();
@@ -223,9 +227,11 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         return;
       polling = true;
       try {
-        const next = await database(undefined, '', state.current.revision);
+        const requestedRevision = state.current.revision;
+        const next = await database(undefined, '', requestedRevision);
         if (active && !pending.current && next) {
-          if (next.revision < state.current.revision) return;
+          if (state.current.revision !== requestedRevision) return;
+
           if (!next.data || !validateData(next.data))
             throw Error(
               'DB 데이터가 없어 새로 저장하지 않았습니다. 백업을 확인해 주세요.',
@@ -312,6 +318,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
           const ack = await database({ data: next, revision, ...(replacement ? { beforeRestore: true } : {}) });
           if (!ack) throw Error('DB 저장 결과를 확인하지 못했습니다.');
           revision = ack.revision;
+          if (ack.data && validateData(ack.data)) { Object.assign(next, ack.data); }
           setBackupWarning(ack.backupWarning || '');
         } else localStorage.setItem(storageKey, JSON.stringify(next));
         adopt(next, revision);
@@ -364,6 +371,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         storage,
         databasePath,
         readOnly,
+        dataRevision,
         commit,
         replace,
       }}

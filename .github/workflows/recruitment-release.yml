@@ -36,6 +36,8 @@ jobs:
           npx playwright install --with-deps chromium
           export CHROMIUM_PATH="$(node -p "require('playwright').chromium.executablePath()")"
           npm run test:mobile-browser
+          npm run test:workspace-browser
+          npm run test:sqlite-browser
       - name: Prepare update assets
         run: |
           mkdir -p release-input

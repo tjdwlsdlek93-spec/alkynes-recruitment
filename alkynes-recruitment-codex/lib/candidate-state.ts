@@ -11,10 +11,11 @@ export function finalStatus(final = ''): Candidate['status'] | null {
   if (value === '합격' || value === '최종합격') return '최종합격';
   return null;
 }
-export function candidateStatus(candidate: Pick<Candidate, 'status' | 'excelFinal' | 'actualJoin' | 'excelStage'>): Candidate['status'] {
+export function candidateStatus(candidate: Pick<Candidate, 'status' | 'excelFinal' | 'actualJoin' | 'excelStage'>, today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short' }).format(new Date())): Candidate['status'] {
   const result = finalStatus(candidate.excelFinal);
   if (result && ['지원포기', '입사포기', '서류불합격', '불합격'].includes(result)) return result;
-  return candidate.actualJoin ? '실제 입사' : result || (compact(candidate.excelStage) === '전형종료' ? '전형종료' : candidate.status);
+  if (candidate.actualJoin) return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short' }).format(new Date(candidate.actualJoin)) > today ? '입사확정' : '실제 입사';
+  return result || (compact(candidate.excelStage) === '전형종료' ? '전형종료' : candidate.status);
 }
 export function endedCandidate(candidate: Candidate) {
   return ['서류불합격', '불합격', '지원포기', '입사포기', '실제 입사', '전형종료'].includes(candidateStatus(candidate));

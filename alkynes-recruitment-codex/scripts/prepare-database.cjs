@@ -16,3 +16,5 @@ fs.writeFileSync(
     },
   ).outputText,
 );
+
+require('esbuild').buildSync({ entryPoints:[path.join(root,'lib/native-services.ts')], outfile:path.join(root,'public/_server/native-services.cjs'), bundle:true, platform:'node', target:'node24', format:'cjs', minify:true, legalComments:'inline' });

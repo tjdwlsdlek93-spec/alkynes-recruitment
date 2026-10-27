@@ -124,6 +124,15 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
     const selectedPath = connection.current.path;
     try {
       if (mounted.current) setStatus((s) => ({ ...s, phase: 'checking' }));
+      const nativeResponse = await request(force ? '/__alkynes/sync/force' : '/__alkynes/sync', force ? { method:'POST' } : {});
+      if (nativeResponse.ok) {
+        const native = await nativeResponse.json();
+        if (native.background) {
+          setStatus(s => ({...s, available:true, enabled:native.enabled, phase:native.phase==='error'?'error':native.phase==='checking'?'checking':'synced', message:native.message, lastSuccess:native.lastSuccess || s.lastSuccess}));
+          window.dispatchEvent(new Event('focus'));
+          return { ok:native.phase!=='error', message:force && native.phase==='synced' && !native.message.startsWith('엑셀 반영 완료') ? '엑셀 반영 완료 · '+native.message : native.message };
+        }
+      } else if (nativeResponse.status !== 404) throw await responseError(nativeResponse);
       const saved = meta();
       const hasRecords = (storeRef.current.data.requests || []).some(
         (q) => q.source === 'kpi-excel',
@@ -299,6 +308,15 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       const config = (await response.json()) as Connection;
       connection.current = { path: config.path, enabled: true };
       setStatus(s => ({ ...s, path: config.path, enabled: true }));
+      const native = await request('/__alkynes/sync/force', {method:'POST'});
+      if (native.ok) {
+        const result=await native.json();
+        if(result.background) {
+          if(result.phase==='error')throw Error(result.message);
+          remember(config.path,result.revision || pending.revision);setPending(null);pendingRef.current=false;
+          window.dispatchEvent(new Event('focus'));return;
+        }
+      } else if(native.status!==404)throw await responseError(native);
       if (
         !await storeRef.current.commit(
           '네이버웍스 동기화 파일 자동 연결 및 ' +
@@ -380,7 +398,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
           </div>
           <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600">
             <li>
-              30초마다 변경을 확인하며, 이 Excel 파일을 기준으로 연결 데이터를
+              서버에서 5초 간격으로 변경을 확인하며, 이 Excel 파일을 기준으로 연결 데이터를
               자동 갱신합니다.
             </li>
             <li>
@@ -396,8 +414,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
               원본 파일과 수식은 수정하지 않습니다.
             </li>
             <li>
-              PC의 네이버웍스 동기화가 먼저 완료되어야 합니다. 앱을 다시 열면
-              변경 내용을 자동 확인합니다.
+              PC의 네이버웍스 동기화가 먼저 완료되어야 합니다. 브라우저를 닫아도 서버가 실행 중이면 자동 반영합니다.
             </li>
           </ul>
           {demo(store.data) && (
@@ -504,11 +521,11 @@ export function ExcelSyncControls() {
       >
         {working
           ? '연결 파일 검증 중…'
-          : status.phase === 'error' && status.enabled ? status.message + ' — 자동 연결 유지, 30초 후 재시도' : status.message || '연결할 파일을 지정해 주세요.'}
+          : status.phase === 'error' && status.enabled ? status.message + ' — 자동 연결 유지, 서버에서 재시도' : status.message || '연결할 파일을 지정해 주세요.'}
       </p>
       <p className="text-xs text-slate-500">
         로그인 시 앱 서버가 자동 시작됩니다. 원본 파일을 앱이 수정하지 않으며,
-        브라우저가 열려 있는 동안 30초 간격으로 반영합니다. 네이버웍스
+        브라우저를 닫아도 서버가 5초 간격으로 변경을 확인합니다. 네이버웍스
         클라이언트도 로그인·동기화 상태여야 합니다.
       </p>
     </section>

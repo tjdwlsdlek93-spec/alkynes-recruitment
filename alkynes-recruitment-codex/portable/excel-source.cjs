@@ -138,7 +138,7 @@ function createSourceHandler({ port, dataDir, defaultFile }) {
       await fs.unlink(tmp).catch(() => {});
     }
   }
-  return async function handle(req, res, pathname) {
+  const handle = async function handle(req, res, pathname) {
     try {
       const hosts = ['127.0.0.1:' + port, 'localhost:' + port];
       if (
@@ -216,5 +216,8 @@ function createSourceHandler({ port, dataDir, defaultFile }) {
       else res.destroy();
     }
   };
+  handle.readConfig = readConfig;
+  handle.readWorkbook = workbook;
+  return handle;
 }
 module.exports = { createSourceHandler };

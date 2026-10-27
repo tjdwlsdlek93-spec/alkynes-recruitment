@@ -40,7 +40,7 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     }
     assert.equal(await todo.evaluate(el=>getComputedStyle(el).animationName),'todo-paper-glow');
     await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await todo.evaluate(el=>getComputedStyle(el).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});
-    await page.screenshot({path:'/workspace/scratch/dashboard-task-postit.png',fullPage:true});
+    await page.screenshot({path:path.join(root,'dashboard-task-postit.png'),fullPage:true});
     await page.goto(base+'/interviews');await page.getByLabel('면접 일정 겹침',{exact:true}).waitFor();
     assert.equal(await page.getByRole('button',{name:'면접 안내문 복사',exact:true}).count(),0);
     await page.getByRole('button',{name:'상세 / 앱 메모',exact:true}).first().click();let dialog=page.getByRole('dialog');
@@ -68,7 +68,7 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await history.getByLabel('엑셀 수정 내용 검색',{exact:true}).fill('비고');
     assert.equal(await history.locator('article').count(),1);
     await history.getByLabel('엑셀 수정 내용 검색',{exact:true}).fill('');
-    await page.screenshot({path:'/workspace/scratch/excel-daily-history.png',fullPage:true});
+    await page.screenshot({path:path.join(root,'excel-daily-history.png'),fullPage:true});
     await page.goto(base+'/candidates');const personRow=page.getByRole('row').filter({hasText:'검증갑'});
     await personRow.getByText('업무검증채용',{exact:true}).waitFor();await personRow.getByText(/검증부서 · HR-/).waitFor();
     await page.getByLabel('지원자 검색',{exact:true}).fill('업무검증채용');assert.equal(await page.getByRole('button',{name:'진행 이력',exact:true}).count(),2);await page.getByLabel('지원자 검색',{exact:true}).fill('');
@@ -88,6 +88,6 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     dialog=page.getByRole('dialog',{name:'백업 복원 확인',exact:true});await dialog.getByRole('button',{name:'복원 확인',exact:true}).click();await dialog.waitFor({state:'detached'});
     assert.equal((await api()).data.candidates.find(c=>c.name==='검증갑').appNotes,'유지할 지원자 메모');
     const backupsAfter=await api(undefined,'/backups');assert.ok(backupsAfter.files.some(f=>f.name.includes('before-restore')));
-    await page.screenshot({path:'/workspace/scratch/workspace-improvements.png',fullPage:true});await stop();await start();await page.reload();await page.getByText('노트북 SQLite 저장',{exact:true}).waitFor();assert.equal((await api()).data.sharedNotices.length,3);assert.deepEqual(errors,[]);
+    await page.screenshot({path:path.join(root,'workspace-improvements.png'),fullPage:true});await stop();await start();await page.reload();await page.getByText('노트북 SQLite 저장',{exact:true}).waitFor();assert.equal((await api()).data.sharedNotices.length,3);assert.deepEqual(errors,[]);
   }finally{if(browser)await browser.close();await stop();await fs.rm(root,{recursive:true,force:true});}
 });

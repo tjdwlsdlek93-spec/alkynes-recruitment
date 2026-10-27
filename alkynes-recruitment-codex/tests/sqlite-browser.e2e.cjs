@@ -176,6 +176,7 @@ test(
         .getByRole('button', { name: '엑셀 업데이트', exact: true })
         .click();
       await page
+        .getByLabel('빠른 업데이트', {exact:true})
         .getByText(/엑셀 반영 완료.*신규 요청 1건.*자동 연결은 일시 중지 상태/, {
           exact: true,
         })
@@ -293,7 +294,7 @@ test(
       await restoreDialog.waitFor({ state: 'hidden' });
       assert.equal((await api()).data.requests[0].appNotes, '대용량 백업 복원 검증');
       await page.screenshot({
-        path: '/workspace/scratch/sqlite-storage-settings.png',
+        path: path.join(root,'sqlite-storage-settings.png'),
         fullPage: true,
       });
       await clean.close();

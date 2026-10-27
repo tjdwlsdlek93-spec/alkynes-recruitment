@@ -70,7 +70,7 @@ function createUpdateHandler({ root, dataDir, port, stop, fetcher = fetch, launc
       seen.add(file.name); size += Buffer.byteLength(file.content, 'base64');
       if (size > 40 * 1024 * 1024) throw Error('업데이트 내용이 너무 큽니다.');
     }
-    for (const name of [...files, 'site/dashboard.html', 'site/settings.html']) if (!seen.has(name)) throw Error('필수 업데이트 파일이 누락되었습니다: ' + name);
+    for (const name of [...files, 'site/dashboard.html', 'site/settings.html', 'site/_server/native-services.cjs']) if (!seen.has(name)) throw Error('필수 업데이트 파일이 누락되었습니다: ' + name);
     const declared = JSON.parse(Buffer.from(payload.files.find(f => f.name === 'version.json').content, 'base64'));
     if (declared.app !== APP || declared.version !== info.version) throw Error('앱 버전이 일치하지 않습니다.');
     const dir = path.join(root, '.updates', crypto.randomUUID());
