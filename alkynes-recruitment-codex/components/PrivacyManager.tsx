@@ -1,0 +1,16 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { useRecruitment } from './RecruitmentProvider';
+import { endedCandidate } from '@/lib/candidate-state';
+import { formatDate } from '@/lib/recruitment';
+export function PrivacyManager() {
+  const {data,dataRevision,storage,readOnly}=useRecruitment(),[id,setId]=useState(''),[confirmation,setConfirmation]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+  const [days,setDays]=useState(180);
+  useEffect(()=>{const v=Number(localStorage.getItem('alkynes.privacyReviewDays'));if(v>=1 && v<=3650)setDays(v);},[]);
+  if(readOnly || storage!=='sqlite')return null;
+  const rows=data.candidates.filter(c=>endedCandidate(c) || c.excelMissing || c.privacyErasedAt);
+  const selected=rows.find(c=>c.id===id);
+  return <section className="card space-y-4 p-6" aria-label="개인정보 관리"><h2>개인정보 보관 · 삭제</h2><p className="text-sm leading-6 text-slate-600">종료된 지원자의 연락처·이력서·메모·안내문과 개인 식별 내용을 삭제합니다. 채용 집계용 일정·결과와 익명 기록은 유지합니다. 자동 삭제하지 않으며 아래에서 확인 후 처리합니다.</p><label className="block text-sm">보관 점검 기준 (일)<input type="number" min="1" max="3650" className="field mt-1 max-w-xs" value={days} onChange={e=>{const v=Math.max(1,Math.min(3650,Number(e.target.value)||1));setDays(v);localStorage.setItem('alkynes.privacyReviewDays',String(v));}}/></label><label className="block text-sm">종료된 지원자<select className="field mt-1" aria-label="개인정보 삭제 대상" value={id} disabled={busy} onChange={e=>{setId(e.target.value);setConfirmation('');setMessage('');}}><option value="">선택하세요</option>{rows.map(c=><option key={c.id} value={c.id}>{c.name} · {data.requisitions.find(j=>j.id===c.requisitionId)?.role}{c.privacyErasedAt?' · 삭제 처리됨':Date.now()-Date.parse(c.updatedAt)>=days*86400000?' · 보관 점검 대상':''}</option>)}</select></label>
+    {selected && <div className="space-y-3 rounded-xl border p-4"><p className="text-sm">최근 기록 변경: {formatDate(selected.updatedAt)}{selected.privacyErasedAt && ' · 개인정보 삭제 완료'}</p><p className="text-sm">보관 점검일: {formatDate(new Date(Date.parse(selected.updatedAt)+days*86400000).toISOString())} · 최근 기록 변경일부터 {days}일 기준</p><p className="text-sm leading-6 text-amber-900">현재 백업 폴더와 앱의 이전 저장 이력도 함께 정리합니다. 이전 DB 이전용 사본은 제거됩니다. 엑셀 원본·직접 다운로드한 파일·예전에 사용한 다른 백업 폴더는 별도로 삭제해야 합니다. 디스크의 복구 불가능한 영구 소거를 보장하는 기능은 아닙니다. 원본 재연동 시 이 고유번호의 개인정보는 다시 가져오지 않습니다.</p><label className="block text-sm">삭제하려면 ‘개인정보 삭제’를 입력하세요<input className="field mt-1" aria-label="개인정보 삭제 확인" value={confirmation} disabled={busy} onChange={e=>setConfirmation(e.target.value)}/></label><button className="btn-secondary" disabled={busy || confirmation!=='개인정보 삭제'} onClick={async()=>{setBusy(true);setMessage('');try{const r=await fetch('/__alkynes/data/privacy',{method:'POST',headers:{'X-Alkynes-Client':'1','Content-Type':'application/json'},body:JSON.stringify({candidateId:id,revision:dataRevision,confirmation})});const v=await r.json();if(!r.ok)throw Error(v.error || '삭제 실패');setMessage('개인정보를 삭제했습니다. 잠시 후 목록이 갱신됩니다.');setConfirmation('');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}}>{busy?'삭제 처리 중…':'개인정보 삭제 실행'}</button></div>}{message && <p role="status" className="text-sm">{message}</p>}
+  </section>;
+}

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatDate } from "@/lib/recruitment";
 import { useRecruitment } from "./RecruitmentProvider";
 export type SyncStatus = {
@@ -12,6 +12,7 @@ export type SyncStatus = {
   sourceName: string;
   dbRevision: number;
   message: string;
+  pending?: {revision:string;removed:number;changed:number;total:number;interviewsRemoved:number;interviewsChanged:number};
   issues: { row: number; field: string; message: string; severity: string }[];
 };
 export function useSyncHealth() {
@@ -107,6 +108,7 @@ export function SyncHealth({ compact = false }: { compact?: boolean }) {
             반영합니다. 파일 저장 중·읽기 오류 시 마지막 정상 데이터를
             유지합니다.
           </p>
+          {status.phase==='review' && status.pending && !readOnly && <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3"><p className="font-bold">대량 변경 적용 보류</p><p className="text-sm">기존 {status.pending.total}명 중 원본 제외 {status.pending.removed}명 · 주요 정보 변경 {status.pending.changed}명 · 면접 제외 {status.pending.interviewsRemoved}건 / 변경 {status.pending.interviewsChanged}건. 엑셀 파일과 내용을 먼저 확인하세요. 승인하면 적용 직전 백업을 남깁니다.</p><button className="btn-secondary" onClick={async()=>{try{const r=await fetch('/__alkynes/sync/approve',{method:'POST',headers:{'X-Alkynes-Client':'1'}});const v=await r.json();if(!r.ok || v.phase==='error')throw Error(v.error || v.message || '승인 실패');setError(v.phase==='review'?'승인 중 원본이 변경되었습니다. 새 변경 내용을 다시 확인하세요.':'승인한 변경을 반영했습니다.');}catch(e){setError((e as Error).message);}}}>변경 내용 확인 · 반영 승인</button></div>}
           <details open={status.issues.length > 0}>
             <summary>입력 점검 {status.issues.length}건</summary>
             <ul className="mt-3 space-y-2 text-sm">
@@ -142,4 +144,18 @@ export function SyncHealth({ compact = false }: { compact?: boolean }) {
       )}
     </section>
   );
+}
+
+export function SyncAlerts() {
+  const status=useSyncHealth(),[now,setNow]=useState(Date.now),[permission,setPermission]=useState(''),sent=useRef('');
+  useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),10000);return()=>clearInterval(t);},[]);
+  const stale=!!status?.enabled && !!status.lastCheck && now-Date.parse(status.lastCheck)>60000;
+  const warning=status && (status.phase==='error' || status.phase==='review' || stale);
+  const summary=warning?(stale?'엑셀 연동 확인이 1분 이상 지연되었습니다.':status.message):'';
+  useEffect(()=>{if(!summary){sent.current='';return;}if(sent.current===summary)return;sent.current=summary;
+    if(typeof Notification!=='undefined' && Notification.permission==='granted' && localStorage.getItem('alkynes.syncNotifications')==='1')new Notification('채용관리 · 연동 확인 필요',{body:'앱에서 엑셀 연결 상태를 확인하세요.'});
+  },[summary]);
+  if(!status)return null;
+  return <section aria-label="연동 알림" className={warning?'card space-y-2 border-amber-400 bg-amber-50 p-4':'text-xs text-slate-500'}>{warning && <><h2 className="font-bold">엑셀 연결 확인 필요</h2><p className="text-sm break-keep">{summary}</p><a href="/requests" className="inline-block underline">엑셀 연동에서 확인</a></>}
+    <button className="mt-1 text-xs underline" onClick={async()=>{if(typeof Notification==='undefined' || !window.isSecureContext){setPermission('이 접속 환경에서는 브라우저 알림을 지원하지 않습니다. 앱 내 알림으로 확인하세요.');return;}const p=await Notification.requestPermission();localStorage.setItem('alkynes.syncNotifications',p==='granted'?'1':'0');setPermission(p==='granted'?'연동 오류 알림을 켰습니다. 브라우저가 열려 있을 때 표시됩니다.':'알림 권한이 허용되지 않았습니다.');}}>연동 오류 브라우저 알림 켜기</button>{permission && <p role="status" className="text-xs">{permission}</p>}</section>;
 }

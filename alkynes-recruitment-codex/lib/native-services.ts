@@ -6,17 +6,11 @@ import { DatabaseSync } from "node:sqlite";
 import { parseExcel, applyExcelSnapshot, type ExcelPlan } from "./excel";
 import { changeSummary } from "./excel-changes";
 import { stabilizePlan } from "./excel-integrity";
+import { entityKinds, dataPatch, applyPatch, auditChanges, type EntityPatch } from './data-operations';
+import { redactPerson, preservePrivacy } from './privacy';
 import { formatDate, validateData, type RecruitmentData } from "./recruitment";
-const kinds = [
-  "requisitions",
-  "candidates",
-  "interviews",
-  "evaluations",
-  "activity",
-  "requests",
-  "sharedNotices",
-  "excelRuns",
-] as const;
+const kinds = entityKinds;
+
 function atomic(file: string, value: string) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temp = file + "." + randomUUID() + ".tmp";
@@ -36,12 +30,13 @@ export function createEntityStore(dataDir: string) {
   fs.mkdirSync(dataDir, { recursive: true });
   const filename = path.join(dataDir, "recruitment.sqlite");
   const sql = new DatabaseSync(filename);
-  sql.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
+  sql.exec(`PRAGMA secure_delete=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS workspace(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL,updated_at TEXT NOT NULL,payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS history(revision INTEGER PRIMARY KEY,updated_at TEXT NOT NULL,payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS migration_backup(id INTEGER PRIMARY KEY,created_at TEXT NOT NULL,payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS records(kind TEXT NOT NULL,id TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(kind,id));
     CREATE TABLE IF NOT EXISTS attachments(id TEXT PRIMARY KEY,content BLOB NOT NULL);
+    CREATE TABLE IF NOT EXISTS privacy_erased(id TEXT PRIMARY KEY,at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS records_order ON records(kind,position);
   `);
   let restoreGeneration = 0;
@@ -177,7 +172,7 @@ export function createEntityStore(dataDir: string) {
       : path.join(dataDir, "backups");
   }
   const backupPattern =
-    /^alkynes-(daily-\d{4}-\d{2}-\d{2}|(?:manual|before-restore)-\d+-[a-f0-9]{8})\.json$/;
+    /^alkynes-(daily-\d{4}-\d{2}-\d{2}|(?:hourly|checkpoint|manual|before-change|before-restore)-\d+-[a-f0-9]{8})\.json$/;
   function backupRows() {
     const dir = directory();
     if (!fs.existsSync(dir)) return [];
@@ -202,9 +197,12 @@ export function createEntityStore(dataDir: string) {
     const suffix =
         kind === "daily" ? today : Date.now() + "-" + randomUUID().slice(0, 8),
       name = "alkynes-" + kind + "-" + suffix + ".json";
-    atomic(path.join(directory(), name), JSON.stringify(data));
+    const target=path.join(directory(), name);
+    if(kind==="daily" && fs.existsSync(target)) return name;
+    atomic(target, JSON.stringify(data));
     for (const [prefix, limit] of [
       ["daily", 30],
+      ["hourly", 168], ["checkpoint", 200], ["before-change", 30],
       ["manual", 20],
       ["before-restore", 10],
     ] as const)
@@ -221,6 +219,9 @@ export function createEntityStore(dataDir: string) {
       backupTimer = undefined;
       try {
         backup();
+        const hour=new Date().toISOString().slice(0,13);
+        if(!backupRows().some(row=>row.name.startsWith("alkynes-hourly-") && row.at.slice(0,13)===hour))backup("hourly");
+        backup("checkpoint");
       } catch (e) {
         backupWarning = "자동 백업 실패: " + (e as Error).message;
       }
@@ -263,6 +264,7 @@ export function createEntityStore(dataDir: string) {
       legacy?: RecruitmentData | null;
       beforeRestore?: boolean;
       migrating?: boolean;
+      privacy?: boolean;
     } = {},
   ) {
     if (!validateData(value))
@@ -288,7 +290,11 @@ export function createEntityStore(dataDir: string) {
         sql
           .prepare("INSERT OR IGNORE INTO migration_backup VALUES (1,?,?)")
           .run(new Date().toISOString(), JSON.stringify(options.legacy));
-      const next = normalize(value);
+      const previous=snapshot(true).data;
+      let guarded=previous?preservePrivacy(previous,value):value;
+      for(const r of sql.prepare('SELECT id,at FROM privacy_erased').all() as {id:string;at:string}[])guarded=redactPerson(guarded,r.id,r.at);
+      if(previous && !options.privacy){const changes=auditChanges(previous,guarded); if(changes.length)guarded={...guarded,auditTrail:[...changes,...[...new Map([...(guarded.auditTrail || []),...(previous.auditTrail || [])].map(a=>[a.id,a])).values()].sort((a,b)=>b.at.localeCompare(a.at))]};}
+      const next = normalize(guarded);
       persist(next);
       const at = new Date().toISOString();
       sql
@@ -299,6 +305,9 @@ export function createEntityStore(dataDir: string) {
       sql.exec(
         "DELETE FROM history WHERE revision NOT IN (SELECT revision FROM history ORDER BY revision DESC LIMIT 5)",
       );
+      const attachmentRefs=new Set<string>();
+      for(const row of sql.prepare("SELECT payload FROM records WHERE kind='candidates' UNION ALL SELECT payload FROM history UNION ALL SELECT payload FROM migration_backup").all() as {payload:string}[]){const v=JSON.parse(row.payload);for(const c of v.candidates || [v])if(c.resumeId)attachmentRefs.add(c.resumeId);}
+      for(const row of sql.prepare('SELECT id FROM attachments').all() as {id:string}[])if(!attachmentRefs.has(row.id))sql.prepare('DELETE FROM attachments WHERE id=?').run(row.id);
       sql.exec("COMMIT");
       cache = { revision: revision + 1, data: next };
       if (options.beforeRestore) restoreGeneration++;
@@ -311,6 +320,7 @@ export function createEntityStore(dataDir: string) {
   }
   function attachment(id: string) {
     if (!/^[a-f0-9]{64}$/.test(id)) return null;
+    if(!sql.prepare("SELECT 1 FROM records WHERE kind='candidates' AND json_extract(payload,'$.resumeId')=? LIMIT 1").get(id))return null;
     const row = sql
       .prepare("SELECT content FROM attachments WHERE id=?")
       .get(id) as { content: Uint8Array } | undefined;
@@ -319,6 +329,49 @@ export function createEntityStore(dataDir: string) {
   return {
     snapshot,
     save,
+    delta(revision: number) {
+      const old=sql.prepare('SELECT payload FROM history WHERE revision=?').get(revision) as {payload:string}|undefined;
+      if(!old)return null;
+      const before=JSON.parse(old.payload);if(!validateData(before))return null;
+      const current=snapshot(true);const {data,...metadata}=current;
+      return {...metadata,baseRevision:revision,changes:dataPatch(before,data!)};
+    },
+    patch(patches: EntityPatch[], revision: number) {
+      const previous=snapshot(true); if(!previous.data || previous.revision!==revision)fail(409,'다른 창에서 먼저 저장했습니다. 다시 확인해 주세요.');
+      const next=applyPatch(previous.data,patches), saved=save(next,revision);
+      const {data,...metadata}=saved;
+      return {...metadata,changes:dataPatch(previous.data,data!)};
+    },
+    erase(candidateId: string, revision: number, confirmation: string) {
+      const current=snapshot(true); const person=current.data?.candidates.find(c=>c.id===candidateId);
+      if(!person || current.revision!==revision)fail(409,'최신 지원자 정보를 다시 확인해 주세요.');
+      if(confirmation!=='개인정보 삭제')fail(400,'확인 문구를 정확히 입력하세요.');
+      const at=new Date().toISOString();
+      // Discover prior names in retained copies before scrubbing all managed copies.
+      const secrets=[person.name,person.phone,person.email,person.resumeName];
+      for(const row of sql.prepare('SELECT payload FROM history UNION ALL SELECT payload FROM migration_backup').all() as {payload:string}[]){const v=JSON.parse(row.payload);const c=v.candidates?.find((c:{id:string})=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
+      const files=backupRows().map(r=>path.join(directory(),r.name));
+      for(const name of fs.readdirSync(dataDir))if(/^before-entity-migration-.*\.json$/.test(name))files.push(path.join(dataDir,name));
+      const copies=files.map(file=>({file,data:JSON.parse(fs.readFileSync(file,'utf8')) as RecruitmentData}));
+      for(const copy of copies){if(!validateData(copy.data))fail(400,'백업 검증 실패. 삭제를 중단했습니다.');const c=copy.data.candidates.find(c=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
+      for(const copy of copies)atomic(copy.file,JSON.stringify(redactPerson(copy.data,candidateId,at,[...secrets])));
+      // Legacy SQLite migration images cannot be safely scrubbed in place.
+      for(const name of fs.readdirSync(dataDir))if(/^before-entity-migration-.*\.sqlite$/.test(name))fs.unlinkSync(path.join(dataDir,name));
+      const redacted=redactPerson(current.data!,candidateId,at,secrets);
+      redacted.activity.unshift({id:randomUUID(),at,actor:'개인정보 관리',message:'지원자 개인정보 및 관리 중인 백업 삭제 처리'});
+      save(redacted,revision,{privacy:true});
+      sql.prepare('INSERT OR REPLACE INTO privacy_erased VALUES(?,?)').run(candidateId,at);
+      sql.exec('BEGIN IMMEDIATE');
+      try {
+        for(const table of ['history','migration_backup'])for(const row of sql.prepare('SELECT rowid AS key,payload FROM '+table).all() as {key:number;payload:string}[]){const data=JSON.parse(row.payload);if(validateData(data))sql.prepare('UPDATE '+table+' SET payload=? WHERE rowid=?').run(JSON.stringify(redactPerson(data,candidateId,at,[...secrets])),row.key);}
+        const refs=new Set<string>();
+        for(const row of sql.prepare('SELECT payload FROM records WHERE kind=\'candidates\' UNION ALL SELECT payload FROM history UNION ALL SELECT payload FROM migration_backup').all() as {payload:string}[]){const v=JSON.parse(row.payload);for(const c of v.candidates || [v])if(c.resumeId)refs.add(c.resumeId);}
+        for(const row of sql.prepare('SELECT id FROM attachments').all() as {id:string}[])if(!refs.has(row.id))sql.prepare('DELETE FROM attachments WHERE id=?').run(row.id);
+        sql.exec('COMMIT');
+      }catch(e){sql.exec('ROLLBACK');throw e;}
+      sql.exec('PRAGMA wal_checkpoint(TRUNCATE); VACUUM');
+      return snapshot(true);
+    },
     attachment,
     backup,
     backupRows,
@@ -404,12 +457,15 @@ export function createStorageHandler({
           "/__alkynes/data",
           "/__alkynes/data/migrate",
           "/__alkynes/data/export",
+          "/__alkynes/data/patch",
+          "/__alkynes/data/privacy",
           "/__alkynes/data/backups",
           "/__alkynes/data/backups/file",
         ].includes(name)
       )
         return send(res, 404, {});
       if (req.method === "GET") {
+        if(name.endsWith("/patch") || name.endsWith("/privacy"))return send(res,405,{});
         if (name.endsWith("/migrate")) return send(res, 405, {});
         if (name.endsWith("/backups/file")) {
           const filename =
@@ -435,6 +491,8 @@ export function createStorageHandler({
             '\"' + (store.info()?.revision || 0) + '\"'
         )
           return send(res, 304, null);
+        const from=/^"(\d+)"$/.exec(String(req.headers['if-none-match'] || ''));
+        if(!name.endsWith('/export') && req.headers['x-alkynes-delta']==='1' && from){const delta=store.delta(Number(from[1]));if(delta)return send(res,200,delta,{ETag:'"'+delta.revision+'"'});}
         const snapshot = store.snapshot(
           name.endsWith("/export")
             ? false
@@ -483,6 +541,8 @@ export function createStorageHandler({
         (body.legacy && !validateData(body.legacy))
       )
         fail(400, "저장 버전이나 이전 데이터를 확인하세요.");
+      if(name.endsWith('/privacy'))return send(res,200,store.erase(body.candidateId,body.revision,body.confirmation));
+      if(name.endsWith('/patch'))return send(res,200,store.patch(body.changes,body.revision));
       const snapshot = store.save(body.data, body.revision, {
         legacy: body.legacy,
         beforeRestore: body.beforeRestore === true,
@@ -538,6 +598,7 @@ export function createSyncService({
     dbRevision: number;
     message: string;
     issues: NonNullable<ExcelPlan["qualityIssues"]>;
+    pending?: { revision:string; removed:number; changed:number; total:number; interviewsRemoved:number; interviewsChanged:number };
   } = {
     phase: "idle",
     enabled: false,
@@ -557,6 +618,7 @@ export function createSyncService({
     status = { ...status, ...next };
     atomic(statusFile, JSON.stringify(status));
   };
+  let approvedHash="";
   async function run(force = false): Promise<typeof status> {
     if (closed) return status;
     if (running) {
@@ -624,6 +686,16 @@ export function createSyncService({
       const previousRun = latest.data.excelRuns?.[0]?.id;
       const draft = structuredClone(latest.data);
       applyExcelSnapshot(draft, plan);
+      Object.assign(draft,preservePrivacy(latest.data,draft));
+      const oldPeople=latest.data.candidates.filter(c=>c.id.startsWith('excel-person-') && !c.excelMissing);
+      const removed=oldPeople.filter(c=>draft.candidates.find(p=>p.id===c.id)?.excelMissing).length;
+      const changed=oldPeople.filter(c=>{const n=draft.candidates.find(p=>p.id===c.id);return n && !n.excelMissing && (n.excelFinal!==c.excelFinal || n.excelStage!==c.excelStage || n.name!==c.name || n.requisitionId!==c.requisitionId);}).length;
+      const oldInterviews=latest.data.interviews.filter(i=>i.source==='kpi-excel');
+      const interviewsRemoved=oldInterviews.filter(i=>!plan.interviews.some(n=>n.id===i.id)).length;
+      const interviewsChanged=oldInterviews.filter(i=>{const n=plan.interviews.find(n=>n.id===i.id);return n && (n.startsAt!==i.startsAt || n.status!==i.status || (plan.interviewFields?.location && n.location!==i.location) || (plan.interviewFields?.interviewers && JSON.stringify(n.interviewers)!==JSON.stringify(i.interviewers)));}).length;
+      const risky=(interviewsRemoved>=3 && interviewsRemoved/oldInterviews.length>=0.25) || (interviewsChanged>=3 && interviewsChanged/oldInterviews.length>=0.5) || (removed>=3 && removed/oldPeople.length>=0.25) || (changed>=5 && changed/oldPeople.length>=0.5);
+      if(risky && approvedHash!==file.revision){set({phase:'review',pending:{revision:file.revision,removed,changed,total:oldPeople.length,interviewsRemoved,interviewsChanged},message:`대량 변경 확인 필요 · 원본 제외 ${removed}명 / 주요 정보 변경 ${changed}명 · 면접 제외 ${interviewsRemoved}건 / 변경 ${interviewsChanged}건`});return status;}
+      if(risky)store.backup('before-change');
       const counts = draft.excelRuns?.[0]?.id !== previousRun ? draft.excelRuns?.[0]?.counts || {} : {};
       draft.activity.unshift({
         id: randomUUID(),
@@ -639,6 +711,7 @@ export function createSyncService({
       lastDay = today;
       set({
         phase: "synced",
+        pending: undefined,
         lastSuccess: new Date().toISOString(),
         revision: file.revision,
         dbRevision: saved.revision,
@@ -721,6 +794,7 @@ export function createSyncService({
   }
   return {
     run,
+    async approve() { if(!status.pending)throw Error('승인 대기 중인 변경이 없습니다.'); approvedHash=status.pending.revision; try{return await run(true);}finally{approvedHash='';} },
     status: () => ({ ...status, running }),
     identifiedCopy,
     close() {

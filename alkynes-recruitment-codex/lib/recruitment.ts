@@ -65,6 +65,7 @@ export type Candidate = Stamped & {
   status: (typeof candidateStatuses)[number];
   notes: string;
   appNotes?: string;
+  privacyErasedAt?: string;
   resumeId?: string;
   resumeName: string;
   resumeData: string;
@@ -134,7 +135,11 @@ export type SharedNotice = {
   audience: 'internal' | 'candidate';
   signature: string;
   at: string;
+  reply?: '회신 대기' | '참석 확정' | '일정 재협의';
+  replyAt?: string;
 };
+export type MessageDraft = { id: string; candidateId: string; kind: string; audience: string; text: string; signature: string; updatedAt: string; date?: string; documents?: string; additional?: string; includeDocuments?: boolean };
+export type AuditEntry = { id:string; at:string; actor:string; entity:string; candidateId:string; kind:string; action:string; fields:{field:string;before:string;after:string}[] };
 export type ExcelChange = { entity: string; candidateId: string; label: string; detail: string };
 export type ExcelRun = {
   id: string;
@@ -154,6 +159,8 @@ export type RecruitmentData = {
   requests?: ProcessRequest[];
   sharedNotices?: SharedNotice[];
   excelRuns?: ExcelRun[];
+  messageDrafts?: MessageDraft[];
+  auditTrail?: AuditEntry[];
 };
 export const storageKey = 'alkynes.recruitment.v1';
 export function newStamp(): Stamped {
@@ -495,6 +502,7 @@ export function validateData(value: unknown): value is RecruitmentData {
           'actualJoin',
           'appNotes',
           'resumeId',
+          'privacyErasedAt',
         ]) &&
         [c.expectedJoin, c.actualJoin].every(
           (v) => !v || Number.isFinite(Date.parse(v)),
@@ -565,13 +573,15 @@ export function validateData(value: unknown): value is RecruitmentData {
   if (d.sharedNotices !== undefined && (!Array.isArray(d.sharedNotices) || !unique(d.sharedNotices) ||
     !d.sharedNotices.every(n => n && str(n, ['id', 'kind', 'targetId', 'candidateId', 'audience', 'signature', 'at']) &&
       ['interview', 'aptitude'].includes(n.kind) && ['internal', 'candidate'].includes(n.audience) &&
-      (n.kind !== 'aptitude' || n.audience === 'internal') && !!n.targetId && !!n.signature && Number.isFinite(Date.parse(n.at))) ||
+      (n.reply === undefined || ['회신 대기','참석 확정','일정 재협의'].includes(n.reply)) && (n.replyAt === undefined || (typeof n.replyAt === 'string' && Number.isFinite(Date.parse(n.replyAt)))) && (n.kind !== 'aptitude' || n.audience === 'internal') && !!n.targetId && !!n.signature && Number.isFinite(Date.parse(n.at))) ||
     new Set(d.sharedNotices.map(n => n.kind + '|' + n.targetId + '|' + n.audience)).size !== d.sharedNotices.length)) return false;
   if (d.excelRuns !== undefined && (!Array.isArray(d.excelRuns) || !unique(d.excelRuns) ||
     !d.excelRuns.every(run => run && str(run, ['id', 'at', 'sourceName']) && Number.isFinite(Date.parse(run.at)) &&
       (run.sourceModifiedAt === undefined || (typeof run.sourceModifiedAt === 'string' && Number.isFinite(Date.parse(run.sourceModifiedAt)))) &&
       run.counts && typeof run.counts === 'object' && !Array.isArray(run.counts) && Object.values(run.counts).every(n => Number.isSafeInteger(n) && n >= 0) &&
       Array.isArray(run.changes) && run.changes.every(change => change && str(change, ['entity', 'candidateId', 'label', 'detail']))))) return false;
+  if (d.messageDrafts !== undefined && (!Array.isArray(d.messageDrafts) || !unique(d.messageDrafts) || !d.messageDrafts.every(r=>r && str(r,['id','candidateId','kind','audience','text','signature','updatedAt']) && Number.isFinite(Date.parse(r.updatedAt)) && optionalStrings(r,['date','documents','additional']) && (r.includeDocuments===undefined || typeof r.includeDocuments==='boolean')))) return false;
+  if (d.auditTrail !== undefined && (!Array.isArray(d.auditTrail) || !unique(d.auditTrail) || !d.auditTrail.every(r=>r && str(r,['id','at','actor','entity','candidateId','kind','action']) && Number.isFinite(Date.parse(r.at)) && Array.isArray(r.fields) && r.fields.every(f=>f && str(f,['field','before','after']))))) return false;
   return (
     [d.requisitions, d.candidates, d.interviews, d.evaluations].every(unique) &&
     d.activity.every(

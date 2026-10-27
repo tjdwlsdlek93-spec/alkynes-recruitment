@@ -18,7 +18,7 @@ const header = { 'X-Alkynes-Client': '1' };
 type Connection = { path: string; enabled: boolean };
 type Status = Connection & {
   available: boolean | null;
-  phase: 'idle' | 'checking' | 'synced' | 'error';
+  phase: 'idle' | 'checking' | 'synced' | 'error' | 'review';
   message: string;
   lastSuccess: string;
 };
@@ -128,9 +128,9 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       if (nativeResponse.ok) {
         const native = await nativeResponse.json();
         if (native.background) {
-          setStatus(s => ({...s, available:true, enabled:native.enabled, phase:native.phase==='error'?'error':native.phase==='checking'?'checking':'synced', message:native.message, lastSuccess:native.lastSuccess || s.lastSuccess}));
+          setStatus(s => ({...s, available:true, enabled:native.enabled, phase:native.phase==='review'?'review':native.phase==='error'?'error':native.phase==='checking'?'checking':'synced', message:native.message, lastSuccess:native.lastSuccess || s.lastSuccess}));
           window.dispatchEvent(new Event('focus'));
-          return { ok:native.phase!=='error', message:force && native.phase==='synced' && !native.message.startsWith('엑셀 반영 완료') ? '엑셀 반영 완료 · '+native.message : native.message };
+          return { ok:!['error','review'].includes(native.phase), message:force && native.phase==='synced' && !native.message.startsWith('엑셀 반영 완료') ? '엑셀 반영 완료 · '+native.message : native.message };
         }
       } else if (nativeResponse.status !== 404) throw await responseError(nativeResponse);
       const saved = meta();
@@ -312,7 +312,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
       if (native.ok) {
         const result=await native.json();
         if(result.background) {
-          if(result.phase==='error')throw Error(result.message);
+          if(result.phase==='error' || result.phase==='review')throw Error(result.message);
           remember(config.path,result.revision || pending.revision);setPending(null);pendingRef.current=false;
           window.dispatchEvent(new Event('focus'));return;
         }
@@ -377,6 +377,7 @@ export function ExcelSyncProvider({ children }: { children: ReactNode }) {
     <SyncContext.Provider
       value={{ status, working, preview, pause, refresh: () => poll(true) }}
     >
+      {status.phase === 'review' && <p role="alert" className="mb-4 text-sm text-amber-800">{status.message} · 엑셀 연동 메뉴에서 내용을 확인하고 승인하세요.</p>}
       {status.enabled && status.phase === 'error' && <p role="alert" className="mb-4 text-sm text-red-700">엑셀 반영 실패: {status.message}</p>}
       {children}
       {pending && (

@@ -313,14 +313,14 @@ function createMobileHandler({ host, localPort, passwordHash, salt }) {
     const pages = ['/', '/dashboard','/candidates','/requisitions','/aptitudes','/interviews','/evaluations'];
     const allowed = data || name === '/__alkynes/sync' || /^\/__alkynes\/attachments\/[a-f0-9]{64}$/.test(name) || name === '/__alkynes/health' || pages.some(p => name === p || (p!=='/' && name === p+'.txt')) || name.startsWith('/_next/static/') || /^\/(fonts|images)\//.test(name) || name === '/favicon.ico';
     if (!allowed || name.includes('..') || name.includes('\\') || name.includes('\0')) return send(res,403,'휴대폰 조회에서 사용할 수 없는 기능입니다.');
-    const upstream = http.request({hostname:'127.0.0.1',port:localPort,path:req.url,method:'GET',headers:{Host:'127.0.0.1:'+localPort,'X-Alkynes-Client':'1','X-Alkynes-Compact':'1',...(req.headers['if-none-match']?{'If-None-Match':req.headers['if-none-match']}:{}),...(req.headers.rsc==='1'?{RSC:'1'}:{})},timeout:15000}, response => {
+    const upstream = http.request({hostname:'127.0.0.1',port:localPort,path:req.url,method:'GET',headers:{Host:'127.0.0.1:'+localPort,'X-Alkynes-Client':'1','X-Alkynes-Compact':'1',...(req.headers['x-alkynes-delta']?{'X-Alkynes-Delta':req.headers['x-alkynes-delta']}:{}),...(req.headers['if-none-match']?{'If-None-Match':req.headers['if-none-match']}:{}),...(req.headers.rsc==='1'?{RSC:'1'}:{})},timeout:15000}, response => {
       if (data && response.statusCode===304) { response.resume(); return send(res,304,''); }
       if (data) {
         const chunks=[];response.on('data',c=>chunks.push(c));response.on('end',()=>{
           try {
             const body = JSON.parse(Buffer.concat(chunks));
             if(response.statusCode!==200 || body.storage!=='sqlite') return send(res,503,'노트북 데이터를 읽지 못했습니다.');
-            send(res,200,JSON.stringify({data:body.data,revision:body.revision,updatedAt:body.updatedAt,storage:'sqlite',readOnly:true,databasePath:'',storageModel:body.storageModel}),'application/json',{ETag:'\"'+body.revision+'\"'});
+            send(res,200,JSON.stringify({data:body.data,...(body.changes?{changes:body.changes,baseRevision:body.baseRevision}:{}),revision:body.revision,updatedAt:body.updatedAt,storage:'sqlite',readOnly:true,databasePath:'',storageModel:body.storageModel}),'application/json',{ETag:'\"'+body.revision+'\"'});
           } catch { send(res,503,'노트북 데이터를 읽지 못했습니다.'); }
         });
       } else {
@@ -431,13 +431,13 @@ function startServer() {
       return reply(res, 400, 'Bad request');
     }
     if (name === '/__alkynes/mobile') { void handleMobile(req, res); return; }
-    if (['/__alkynes/sync','/__alkynes/sync/force','/__alkynes/source/identified'].includes(name)) {
+    if (['/__alkynes/sync','/__alkynes/sync/force','/__alkynes/sync/approve','/__alkynes/source/identified'].includes(name)) {
       const hosts = ['127.0.0.1:'+port,'localhost:'+port];
       if (!hosts.includes(req.headers.host) || req.headers['x-alkynes-client']!=='1' || (req.headers.origin && !hosts.map(h=>'http://'+h).includes(req.headers.origin))) return reply(res,403,'Forbidden');
-      if ((name.endsWith('/force') && req.method!=='POST') || (!name.endsWith('/force') && req.method!=='GET')) return reply(res,405,'Method not allowed');
+      if (((name.endsWith('/force') || name.endsWith('/approve')) && req.method!=='POST') || (!(name.endsWith('/force') || name.endsWith('/approve')) && req.method!=='GET')) return reply(res,405,'Method not allowed');
       void (async()=>{try {
         if(name.endsWith('/identified')) { const content=await sync.identifiedCopy(); res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Cache-Control':'no-store'});return res.end(content); }
-        const status=name.endsWith('/force')?await sync.run(true):sync.status();res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...status,background:true}));
+        const status=name.endsWith('/approve')?await sync.approve():name.endsWith('/force')?await sync.run(true):sync.status();res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({...status,background:true}));
       } catch(e) {res.writeHead(500,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:e.message}));}})(); return;
     }
     if (name.startsWith('/__alkynes/data') || name.startsWith('/__alkynes/attachments/')) {

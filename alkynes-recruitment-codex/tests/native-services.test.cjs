@@ -341,3 +341,49 @@ test('an occupied application port cannot migrate or modify the existing databas
  const root=await temp(),config=path.join(root,'config');let child;const occupied=http.createServer((req,res)=>res.end('existing process'));await new Promise(r=>occupied.listen(0,'127.0.0.1',r));
  try{await fsp.cp(path.resolve(__dirname,'../portable'),root,{recursive:true});await fsp.cp(path.resolve(__dirname,'../public/_server'),path.join(root,'site','_server'),{recursive:true});await fsp.mkdir(config);const original=seedData(),db=new DatabaseSync(path.join(config,'recruitment.sqlite'));db.exec('CREATE TABLE workspace(id INTEGER PRIMARY KEY,revision INTEGER,updated_at TEXT,payload TEXT)');db.prepare('INSERT INTO workspace VALUES(1,1,?,?)').run(new Date().toISOString(),JSON.stringify(original));db.close();child=require('node:child_process').spawn(process.execPath,[path.join(root,'server.cjs')],{env:{...process.env,ALKYNES_PORT:String(occupied.address().port),ALKYNES_DATA_DIR:config},stdio:'ignore'});assert.equal(await new Promise(r=>child.once('exit',r)),1);const after=new DatabaseSync(path.join(config,'recruitment.sqlite'));assert.deepEqual(JSON.parse(after.prepare('SELECT payload FROM workspace').get().payload),original);after.close();assert.ok(!fs.readdirSync(config).some(name=>name.startsWith('before-entity-migration-')));}finally{child?.kill();occupied.closeAllConnections();await new Promise(r=>occupied.close(r));await fsp.rm(root,{recursive:true,force:true});}
 });
+
+test('recovery checkpoints preserve early same-day data; partial writes audit identity changes and respect revisions',async()=>{
+  const dir=await temp(),store=services.createEntityStore(dir);
+  try {
+    const data=seedData();store.save(data,0);const first=store.backup(),before=fs.readFileSync(path.join(store.directory(),first),'utf8');
+    const c=store.snapshot(true).data.candidates[0],revision=store.info().revision;
+    const ack=store.patch([{kind:'candidates',upsert:[{...c,name:'synthetic-renamed',phone:'010-0000-0000'}],remove:[]}],revision);
+    assert.ok(!('data' in ack));assert.ok(ack.changes.some(p=>p.kind==='auditTrail'));
+    const delta=store.delta(revision);assert.equal(delta.baseRevision,revision);assert.equal(delta.revision,ack.revision);assert.ok(delta.changes.some(p=>p.kind==='candidates'));assert.equal(store.delta(99999),null);
+    assert.equal(store.snapshot(true).data.candidates[0].name,'synthetic-renamed');
+    assert.ok(store.snapshot(true).data.auditTrail.some(a=>a.candidateId===c.id&&a.fields.some(f=>f.field==='이름')));
+    assert.throws(()=>store.patch([],revision),/다른 창/);
+    assert.equal(store.backup(),first);assert.equal(fs.readFileSync(path.join(store.directory(),first),'utf8'),before);
+    const x=store.backup('checkpoint'),y=store.backup('checkpoint');assert.notEqual(x,y);
+    assert.throws(()=>store.patch([{kind:'candidates',upsert:[],remove:[],order:['missing']}],store.info().revision),/순서/);
+  }finally{store.close();await fsp.rm(dir,{recursive:true,force:true});}
+});
+test('privacy erasure scrubs managed backups and histories, removes PDFs, and cannot be undone by restoring or reimporting old values',async()=>{
+  const dir=await temp();let store=services.createEntityStore(dir);
+  try {
+    const data=seedData(),c=data.candidates[0];c.name='synthetic-private-person';c.phone='010-1111-2222';c.resumeData='data:application/pdf;base64,'+Buffer.from('%PDF-1.4\nprivate synthetic').toString('base64');c.resumeName='private.pdf';
+    store.save(data,0);const resume=store.snapshot(true).data.candidates[0].resumeId;store.backup('manual');
+    assert.throws(()=>store.erase(c.id,1,'wrong'),/확인 문구/);
+    store.erase(c.id,1,'개인정보 삭제');
+    assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');assert.equal(store.attachment(resume),null);
+    for(const row of store.backupRows()){const text=fs.readFileSync(path.join(store.directory(),row.name),'utf8');assert.ok(!text.includes(c.name));assert.ok(!text.includes(c.phone));assert.ok(!text.includes(c.resumeData));}
+    const db=new DatabaseSync(path.join(dir,'recruitment.sqlite'));assert.equal(db.prepare('SELECT count(*) AS n FROM attachments').get().n,0);for(const t of ['history','migration_backup'])for(const row of db.prepare('SELECT payload FROM '+t).all())assert.ok(!row.payload.includes(c.name));db.close();
+    store.save(data,store.info().revision,{beforeRestore:true});assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');
+    store.close();store=services.createEntityStore(dir);store.save(data,store.info().revision);assert.equal(store.snapshot(true).data.candidates[0].resumeId,undefined);assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');
+  }finally{store.close();await fsp.rm(dir,{recursive:true,force:true});}
+});
+test('mass source exclusions are held for approval and a pre-change recovery point is created',async()=>{
+  const dir=await temp(),store=services.createEntityStore(path.join(dir,'config'));let sync;
+  try {
+    const empty=seedData();empty.candidates=[];empty.interviews=[];empty.evaluations=[];empty.requisitions=[];store.save(empty,0);
+    const book=new ExcelJS.Workbook(),sheet=book.addWorksheet('채용프로세스 적시성');sheet.getRow(5).values=['채용건명','의뢰 부서','의뢰자','지원자명','요청 구분','요청일','처리완료일','처리기한','기한 판정','인적성 검사 일시','면접 일시','현재 선발 단계','최종 결과','실제 입사일','비고'];
+    for(let i=0;i<6;i++)sheet.getRow(6+i).values=['검증공고','검증부서','담당자','가상지원자'+i,'면접 요청',new Date('2026-10-20T00:00:00Z'),null,null,null,null,new Date('2026-10-30T05:00:00Z'),'면접예정','미확정',null,''];
+    const file=path.join(dir,'synthetic.xlsx');await book.xlsx.writeFile(file);
+    const source={readConfig:async()=>({path:file,enabled:true}),readWorkbook:async()=>{const content=await fsp.readFile(file);return {content,revision:require('node:crypto').createHash('sha256').update(content).digest('hex'),name:'synthetic.xlsx',modifiedAt:(await fsp.stat(file)).mtime.toISOString()};}};
+    sync=services.createSyncService({store,source,dataDir:store.directory()});await sync.run(true);assert.equal(store.snapshot(true).data.candidates.length,6);
+    for(let r=9;r<12;r++)sheet.getRow(r).values=[];await book.xlsx.writeFile(file);const revision=store.info().revision;
+    assert.equal((await sync.run(true)).phase,'review');assert.equal(store.info().revision,revision);assert.equal(store.snapshot(true).data.candidates.filter(c=>!c.excelMissing).length,6);
+    assert.equal((await sync.approve()).phase,'synced');assert.equal(store.snapshot(true).data.candidates.filter(c=>!c.excelMissing).length,3);assert.ok(store.backupRows().some(r=>r.name.includes('before-change')));
+    for(let r=6;r<9;r++)sheet.getCell('K'+r).value=null;await book.xlsx.writeFile(file);assert.equal((await sync.run(true)).phase,'review');assert.equal(sync.status().pending.interviewsRemoved,3);
+  }finally{sync?.close();store.close();await fsp.rm(dir,{recursive:true,force:true});}
+});

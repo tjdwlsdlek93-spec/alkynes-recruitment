@@ -8,6 +8,7 @@ import {
   validateData,
   type RecruitmentData,
 } from '@/lib/recruitment';
+import { PrivacyManager } from '@/components/PrivacyManager';
 import { AutomaticBackups } from '@/components/AutomaticBackups';
 import { MobileAccess } from '@/components/MobileAccess';
 import { AppUpdate } from '@/components/AppUpdate';
@@ -44,6 +45,7 @@ export default function Page() {
       <MobileAccess />
       <div className="card space-y-3 p-6"><h2>데이터 저장소</h2><p className="font-bold">{storage === 'sqlite' ? '노트북 SQLite 저장' : '브라우저 저장 (미리보기 / 이전 서버)'}</p>{databasePath && <p className="break-all text-sm text-slate-600">{databasePath}</p>}<p className="text-sm text-slate-600">{storage === 'sqlite' ? '채용 기록은 이 노트북의 DB 파일에 저장됩니다. 브라우저 기록을 지워도 DB는 유지되며, 외부 서버로 전송하지 않습니다. 이전 시점의 브라우저 원본과 최근 5회 저장 이력도 DB에 보관합니다.' : '현재 서버에는 SQLite 저장 기능이 없습니다. 노트북 앱을 업데이트하면 기존 브라우저 데이터를 DB로 이전합니다.'}</p></div>
       <AutomaticBackups onRestore={setBackup} />
+      <PrivacyManager />
       <div className="card space-y-4 p-6">
         <h2 className="font-bold">데이터 백업</h2>
         <p className="text-sm text-slate-600">
@@ -82,6 +84,7 @@ export default function Page() {
           </p>
         )}
       </div>
+      <details className="card p-6"><summary className="cursor-pointer font-bold">상세 변경 이력 {data.auditTrail?.length || 0}건</summary><div className="mt-4 max-h-96 space-y-3 overflow-y-auto">{data.auditTrail?.map(a=><div key={a.id} className="rounded-xl border p-3 text-sm"><p className="font-bold">{data.candidates.find(c=>c.id===a.candidateId)?.name || ({requisitions:'채용 요청',candidates:'지원자',interviews:'면접',requests:'전형 요청',evaluations:'면접 평가',sharedNotices:'안내 상태',messageDrafts:'안내문'} as Record<string,string>)[a.kind] || '업무 기록'} · {a.action}</p><p className="text-xs text-slate-500">{formatDate(a.at)} · {a.actor}</p>{a.fields.map((f,i)=><p key={i} className="mt-1 break-all whitespace-pre-wrap">{f.field}: {f.before || '없음'} → {f.after || '없음'}</p>)}</div>)}</div></details>
       <div className="card p-6">
         <h2 className="mb-4 font-bold">변경 이력 (로컬 기록)</h2>
         <div className="max-h-96 space-y-3 overflow-y-auto">
@@ -106,7 +109,9 @@ export default function Page() {
             채용요청 {backup.requisitions.length}건 · 지원자{' '}
             {backup.candidates.length}명 · 면접 {backup.interviews.length}건 ·
             평가 {backup.evaluations.length}건
+            <br/>현재와 비교: 지원자 {backup.candidates.filter(c=>!data.candidates.some(p=>p.id===c.id)).length}명 추가 · {data.candidates.filter(c=>!backup.candidates.some(p=>p.id===c.id)).length}명 제외 · {backup.candidates.filter(c=>{const p=data.candidates.find(p=>p.id===c.id);return p && JSON.stringify(p)!==JSON.stringify(c);}).length}명 정보 변경
           </p>
+          <details className="mt-4 rounded-xl border p-3"><summary className="cursor-pointer text-sm font-bold">지원자 변경 내용 확인</summary><div className="mt-2 max-h-60 space-y-2 overflow-y-auto">{backup.candidates.filter(c=>{const p=data.candidates.find(p=>p.id===c.id);return !p || JSON.stringify(p)!==JSON.stringify(c);}).map(c=>{const p=data.candidates.find(p=>p.id===c.id);return <div key={c.id} className="border-b py-2 text-sm"><strong>{p?.name || '현재 없음'} → {c.name}</strong><p>상태: {p?.excelFinal || p?.status || '없음'} → {c.excelFinal || c.status}</p><p>실제 입사일: {p?.actualJoin || '없음'} → {c.actualJoin || '없음'}</p></div>;})}</div></details>
           <div className="mt-5 flex justify-end gap-2">
             <button className="btn-secondary" onClick={() => setBackup(null)}>
               취소

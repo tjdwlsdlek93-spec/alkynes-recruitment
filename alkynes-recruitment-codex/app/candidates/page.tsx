@@ -12,6 +12,7 @@ import { candidateStatus, endedCandidate, finalStatus } from '@/lib/candidate-st
 import { closedJob, latestRequest } from '@/lib/recruitment-view';
 export default function Page() {
   const { data, commit, readOnly } = useRecruitment();
+  const [page,setPage]=useState(1);
   const [editing, setEditing] = useState<Candidate | null | undefined>(),
     [query, setQuery] = useState(''),
     [historyId, setHistoryId] = useState(''),
@@ -115,6 +116,8 @@ export default function Page() {
         .toLowerCase()
         .includes(query.toLowerCase()),
   ).sort((a, b) => latestRequest(data, b.requisitionId, b.id).localeCompare(latestRequest(data, a.requisitionId, a.id)));
+  useEffect(()=>setPage(1),[query,req,status,group]);
+  const currentPage=Math.min(page,Math.max(1,Math.ceil(rows.length/30)));
   const acceptedPerson = data.candidates.find(c => c.id === acceptanceId && !c.excelMissing && ['최종합격', '입사확정'].includes(candidateStatus(c)));
   const historyPerson = data.candidates.find(c => c.id === historyId);
   const historyJob = data.requisitions.find(r => r.id === historyPerson?.requisitionId);
@@ -191,7 +194,7 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((c) => {
+            {rows.slice((currentPage-1)*30,currentPage*30).map((c) => {
               const job = data.requisitions.find(r => r.id === c.requisitionId);
               return (
               <tr className="border-t" key={c.id}>
@@ -233,6 +236,7 @@ export default function Page() {
         </table>
         {!rows.length && <Empty>조건에 맞는 지원자가 없습니다.</Empty>}
       </div>
+      {rows.length>30 && <nav aria-label="지원자 목록 페이지" className="flex items-center justify-center gap-3"><button className="btn-secondary" disabled={currentPage<=1} onClick={()=>setPage(currentPage-1)}>이전</button><span>{currentPage} / {Math.ceil(rows.length/30)} · 총 {rows.length}명</span><button className="btn-secondary" disabled={currentPage*30>=rows.length} onClick={()=>setPage(currentPage+1)}>다음</button></nav>}
       {acceptedPerson && <AcceptanceMessage key={acceptedPerson.id} person={acceptedPerson} role={data.requisitions.find(r => r.id === acceptedPerson.requisitionId)?.role || '채용'} onClose={() => setAcceptanceId('')} />}
       {historyPerson && <Modal title={historyPerson.name + ' · 지원자 진행 이력'} onClose={() => setHistoryId('')}>
         <p className="font-bold">{historyJob?.role || '공고 정보 없음'}</p>

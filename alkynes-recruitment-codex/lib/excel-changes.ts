@@ -26,7 +26,7 @@ export function excelChanges(before: RecruitmentData, after: RecruitmentData, so
     if (!old || (old.excelMissing && !c.excelMissing)) add('신규 지원자', c.id, c.id, c.name);
     else if (!old.excelMissing && c.excelMissing) add('원본 제외 지원자', c.id, c.id, c.name);
     else if (!c.excelMissing) {
-      const details = diff([['진행상태', candidateStatus(old), candidateStatus(c)], ['현재 선발 단계', old.excelStage, c.excelStage], ['최종 결과', old.excelFinal, c.excelFinal]]);
+      const details = diff([['이름',old.name,c.name], ['지원 공고',old.requisitionId,c.requisitionId], ['연락처',old.phone,c.phone], ['이메일',old.email,c.email], ['경력',old.career,c.career], ['메모',old.notes,c.notes], ['진행상태', candidateStatus(old), candidateStatus(c)], ['현재 선발 단계', old.excelStage, c.excelStage], ['최종 결과', old.excelFinal, c.excelFinal]]);
       if (details.length) add(endedCandidate(c) && !endedCandidate(old) ? '전형 종료' : '진행상태 변경', c.id, c.id, c.name + '\n' + details.join('\n'));
       const joinDates = diff([['입사예정일', date(old.expectedJoin), date(c.expectedJoin)], ['실제 입사일', date(old.actualJoin), date(c.actualJoin)]]);
       if (joinDates.length) add('입사일 변경', c.id, c.id, c.name + '\n' + joinDates.join('\n'));

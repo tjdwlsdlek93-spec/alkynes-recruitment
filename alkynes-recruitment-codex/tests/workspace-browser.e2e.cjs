@@ -28,6 +28,8 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await page.goto(base+'/dashboard');await page.getByRole('heading',{name:'채용 현황',exact:true}).waitFor();
     const refresh=async()=>{await page.getByRole('button',{name:'엑셀 업데이트',exact:true}).click();await page.getByLabel('빠른 업데이트',{exact:true}).getByRole('status').filter({hasText:'엑셀 반영 완료'}).waitFor();};
     await refresh();let saved=await api();assert.equal(saved.data.interviews.length,2);assert.equal(saved.data.excelRuns.length,1);
+    await page.route('**/__alkynes/sync/force',route=>route.fulfill({json:{background:true,enabled:true,phase:'review',message:'대량 변경 확인 필요 · 검증용 보류',lastSuccess:''}}));
+    await page.getByRole('button',{name:'엑셀 업데이트',exact:true}).click();await page.getByLabel('빠른 업데이트',{exact:true}).getByRole('alert').filter({hasText:'대량 변경 확인 필요 · 검증용 보류'}).waitFor();assert.equal((await api()).revision,saved.revision);await page.unroute('**/__alkynes/sync/force');
     const todo = page.getByLabel('오늘 챙길 일',{exact:true});
     await todo.getByText('오늘 면접',{exact:true}).first().waitFor();
     assert.equal(await page.locator('.week-note a').count(),0);await page.locator('.week-note').getByText('오늘을 제외한 이번 주 면접이 없습니다.',{exact:true}).waitFor();
@@ -54,6 +56,9 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await dialog.getByRole('button',{name:'카톡 메시지 복사',exact:true}).click();assert.equal((await api()).data.sharedNotices?.length||0,0);
     await dialog.getByRole('button',{name:'안내 완료로 표시',exact:true}).click();await dialog.getByRole('button',{name:'미안내로 변경',exact:true}).waitFor();
     await dialog.getByLabel('공유 대상',{exact:true}).selectOption('candidate');await dialog.getByRole('button',{name:'안내 완료로 표시',exact:true}).click();await dialog.getByRole('button',{name:'미안내로 변경',exact:true}).waitFor();
+    await dialog.getByLabel('지원자 회신',{exact:true}).selectOption('참석 확정');await page.waitForFunction(()=>document.querySelector('select[aria-label="지원자 회신"]')?.value==='참석 확정');
+    const draftText=(await dialog.getByLabel('공유 안내문',{exact:true}).inputValue())+'\n초안 보관 확인';await dialog.getByLabel('공유 안내문',{exact:true}).fill(draftText);await dialog.getByRole('button',{name:'초안 저장',exact:true}).click();await dialog.getByText('초안을 저장했습니다.',{exact:true}).waitFor();
+    assert.equal((await api()).data.sharedNotices.find(n=>n.audience==='candidate').reply,'참석 확정');
     await dialog.getByRole('button',{name:'닫기',exact:true}).last().click();assert.equal((await api()).data.sharedNotices.length,2);
     sheet.getCell('AF6').value='변경회의실';await book.xlsx.writeFile(file);await fs.utimes(file,new Date('2026-10-22T01:00:00Z'),new Date('2026-10-22T01:00:00Z'));await refresh();
     await page.getByText('지원자 · 변경 · 재안내 필요',{exact:true}).waitFor();await page.getByText('사내 · 변경 · 재안내 필요',{exact:true}).waitFor();
@@ -87,10 +92,12 @@ test('workspace improvements survive Excel refresh, SQLite restart and confirmed
     await page.getByRole('button',{name:'카톡 안내문',exact:true}).click();dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'안내 완료로 표시',exact:true}).click();await dialog.getByRole('button',{name:'미안내로 변경',exact:true}).waitFor();await dialog.getByRole('button',{name:'닫기',exact:true}).last().click();
     await page.goto(base+'/settings');const backups=page.getByLabel('자동 백업',{exact:true});await backups.getByRole('button',{name:'지금 백업',exact:true}).click();await backups.getByText('별도 백업 파일을 저장했습니다.',{exact:true}).waitFor();
     const before=await api();const changed=structuredClone(before.data);changed.candidates.find(c=>c.name==='검증갑').appNotes='복원 전 변경';await api({data:changed,revision:before.revision});
-    await page.reload();await backups.getByText(/저장된 백업 \d+개/).click();const manual=backups.locator('div.flex').filter({hasText:'수동 백업'});await manual.getByRole('button',{name:'이 백업 복원',exact:true}).click();
+    await page.reload();await backups.getByText(/저장된 백업 \d+개/).click();const manual=backups.locator('div.flex').filter({hasText:'수동 백업'});await manual.getByRole('button',{name:'복원 내용 미리보기',exact:true}).click();
     dialog=page.getByRole('dialog',{name:'백업 복원 확인',exact:true});await dialog.getByRole('button',{name:'복원 확인',exact:true}).click();await dialog.waitFor({state:'detached'});
     assert.equal((await api()).data.candidates.find(c=>c.name==='검증갑').appNotes,'유지할 지원자 메모');
     const backupsAfter=await api(undefined,'/backups');assert.ok(backupsAfter.files.some(f=>f.name.includes('before-restore')));
-    await page.screenshot({path:path.join(root,'workspace-improvements.png'),fullPage:true});await stop();await start();await page.reload();await page.getByText('노트북 SQLite 저장',{exact:true}).waitFor();assert.equal((await api()).data.sharedNotices.length,3);assert.deepEqual(errors,[]);
+    await page.screenshot({path:path.join(root,'workspace-improvements.png'),fullPage:true});await stop();await start();await page.reload();await page.getByText('노트북 SQLite 저장',{exact:true}).waitFor();assert.equal((await api()).data.sharedNotices.length,3);
+    const privateSnapshot=await api(),privatePerson=privateSnapshot.data.candidates.find(c=>c.name==='검증갑');privatePerson.excelFinal='지원포기';await api({data:privateSnapshot.data,revision:privateSnapshot.revision});await page.reload();
+    const privacy=page.getByLabel('개인정보 관리',{exact:true});await privacy.getByLabel('개인정보 삭제 대상',{exact:true}).selectOption(privatePerson.id);await privacy.getByLabel('개인정보 삭제 확인',{exact:true}).fill('개인정보 삭제');await privacy.getByRole('button',{name:'개인정보 삭제 실행',exact:true}).click();await privacy.getByText('개인정보를 삭제했습니다. 잠시 후 목록이 갱신됩니다.',{exact:true}).waitFor();assert.equal((await api()).data.candidates.find(c=>c.id===privatePerson.id).name,'개인정보 삭제');assert.deepEqual(errors,[]);
   }finally{if(browser)await browser.close();await stop();await fs.rm(root,{recursive:true,force:true});}
 });

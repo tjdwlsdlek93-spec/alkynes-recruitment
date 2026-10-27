@@ -7,6 +7,7 @@ import { useRecruitment } from '@/components/RecruitmentProvider';
 import { Empty } from '@/components/Forms';
 import { koreaDate } from '@/lib/scheduling';
 import { RecruitmentCalendar } from '@/components/RecruitmentCalendar';
+import { HiringMetrics } from '@/components/HiringMetrics';
 import { TodayWork } from '@/components/WorkspaceOverview';
 import { formatDate, formatDateOnly } from '@/lib/recruitment';
 import { closedJob, requestedPeople, latestRequest } from '@/lib/recruitment-view';
@@ -84,6 +85,7 @@ export default function Dashboard() {
       </div>
         <div className="card desk-note p-5"><span className="board-eyebrow">BOARD MEMO</span><h2 className="mt-3 font-bold">이렇게 확인하세요</h2><ul className="mt-4 space-y-3 text-xs leading-6 text-slate-600"><li>· 엑셀 저장 후 좌측의 <strong>엑셀 업데이트</strong>를 누르면 바로 반영됩니다.</li><li>· 입사포기·지원포기 등 종료된 전형은 진행중 집계에서 제외합니다.</li><li>· 인적성·면접 화면에서 카톡 안내문을 작성하고 복사할 수 있습니다.</li></ul></div>
       </aside></div>
+      <HiringMetrics month={month} />
       <div className="card overflow-x-auto">
         <div className="border-b p-5">
           <span className="section-label">HIRING NOW</span><h2 className="font-bold">진행중 채용</h2>

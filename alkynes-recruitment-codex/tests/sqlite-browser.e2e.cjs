@@ -189,7 +189,7 @@ test(
       const dialog = page.getByRole('dialog');
       await dialog.locator('textarea[name=notes]').fill('디스크 저장 검증');
       let fail = true;
-      await page.route('**/__alkynes/data', (route) =>
+      await page.route(/\/__alkynes\/data(?:\/patch)?$/, (route) =>
         fail && route.request().method() === 'POST'
           ? route.fulfill({
               status: 507,

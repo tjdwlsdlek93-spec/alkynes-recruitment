@@ -125,3 +125,17 @@ test('unchanged Excel entities keep their modification time instead of rewriting
  const plan={jobs:[{...job,updatedAt:'2099-01-01T00:00:00Z'}],candidates:[{...person,updatedAt:'2099-01-01T00:00:00Z'}],requests:[],interviews:[],warnings:[],rows:1,businessDays:1,sourceName:'synthetic.xlsx'};
  applyExcelPlan(data,plan);assert.equal(data.requisitions[0].updatedAt,job.updatedAt);assert.equal(data.candidates[0].updatedAt,person.updatedAt);
 });
+
+test('partial entity patches retain unaffected records, validate order and produce field audit entries',()=>{
+  const {dataPatch,applyPatch,auditChanges}=load('data-operations'),before=fixture(),after=structuredClone(before);
+  after.candidates[0].name='변경이름';after.candidates[0].phone='010-0000-0000';after.candidates.reverse();
+  const patches=dataPatch(before,after);assert.deepEqual(applyPatch(before,patches),after);assert.equal(patches.length,1);assert.equal(patches[0].upsert.length,1);
+  const audit=auditChanges(before,after);assert.ok(audit.some(a=>a.candidateId===before.candidates[0].id&&a.fields.some(f=>f.field==='이름')));assert.ok(!JSON.stringify(audit).includes('resumeData'));
+  assert.throws(()=>applyPatch(before,[{kind:'candidates',upsert:[],remove:[],order:['unknown']}]),/순서/);
+});
+test('monthly metrics use explicit cohorts, actual join dates and no invented values when observations are missing',()=>{
+  const {hiringMetrics}=load('metrics'),data=fixture();data.requests=[];
+  assert.equal(hiringMetrics(data,'2026-10').meanHours,null);assert.equal(hiringMetrics(data,'2026-10').meanJoinDays,null);
+  const c=data.candidates[0];c.excelFinal='지원포기';data.requests=[{id:'metric-q',candidateId:c.id,requisitionId:c.requisitionId,stage:'면접 요청',status:'요청 완료',receivedAt:'2026-10-20T00:00:00Z',completedAt:'2026-10-21T00:00:00Z'}];
+  const metrics=hiringMetrics(data,'2026-10');assert.equal(metrics.meanHours,24);assert.equal(metrics.forfeits,1);assert.equal(metrics.cohort,1);assert.equal(hiringMetrics(data,'2026-11').requests,0);
+});

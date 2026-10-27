@@ -1,4 +1,5 @@
 'use client';
+import { SyncAlerts } from './SyncHealth';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRecruitment } from './RecruitmentProvider';
@@ -18,6 +19,7 @@ export function TodayWork({ now }: { now: number }) {
       {conflicts.length > 0 && <Link className="block rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-800" href="/interviews">면접 시간·장소·면접관 겹침 {conflicts.length}건 확인</Link>}
       {items.map(item => <Link key={item.id} href={item.href} className={'block rounded-lg border p-3 text-xs ' + (item.urgent ? 'border-amber-300 bg-amber-50' : 'border-amber-200 bg-white/60')}><strong>{item.title}</strong><p className="mt-1 break-keep">{item.detail}</p><p className="mt-1 text-[11px] text-slate-500">{formatDate(item.at)}</p></Link>)}
     </div>
+    <SyncAlerts />
     {!pending && <p className="mt-3 text-sm text-slate-500">지금은 챙길 일이 없어요!</p>}
   </section>;
 }

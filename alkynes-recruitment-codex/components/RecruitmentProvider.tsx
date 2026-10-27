@@ -13,6 +13,7 @@ import {
   validateData,
   type RecruitmentData,
 } from '@/lib/recruitment';
+import { dataPatch, applyPatch, type EntityPatch } from '@/lib/data-operations';
 import { MobileRefresh } from './MobileRefresh';
 import { removeLegacySamples } from '@/lib/recruitment-view';
 type Mode = 'loading' | 'sqlite' | 'browser';
@@ -23,6 +24,7 @@ type Snapshot = {
   databasePath: string;
   backupWarning?: string;
   readOnly?: boolean;
+  changes?: EntityPatch[];
 };
 type Store = {
   dataRevision: number;
@@ -52,12 +54,14 @@ async function database(
   body?: object,
   suffix = '',
   revision?: number,
+  base?: RecruitmentData,
 ): Promise<Snapshot | null> {
   const response = await fetch('/__alkynes/data' + suffix, {
     method: body ? 'POST' : 'GET',
     headers: {
       'X-Alkynes-Client': '1',
       'X-Alkynes-Compact': '1',
+      ...(base?{'X-Alkynes-Delta':'1'}:{}),
       ...(body ? { 'Content-Type': 'application/json' } : {}),
       ...(revision ? { 'If-None-Match': '"' + revision + '"' } : {}),
     },
@@ -76,6 +80,7 @@ async function database(
     throw new StorageError(message, response.status);
   }
   const result = await response.json();
+  if(result.changes && base){if(result.baseRevision!==revision)throw Error('변경 자료의 기준 버전이 다릅니다. 다시 확인하세요.');result.data=applyPatch(base,result.changes);}
   if (
     result.storage !== 'sqlite' ||
     !Number.isSafeInteger(result.revision) ||
@@ -228,7 +233,7 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
       polling = true;
       try {
         const requestedRevision = state.current.revision;
-        const next = await database(undefined, '', requestedRevision);
+        const next = await database(undefined, '', requestedRevision, state.current.data);
         if (active && !pending.current && next) {
           if (state.current.revision !== requestedRevision) return;
 
@@ -300,11 +305,10 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
         let latest = state.current.data,
           revision = state.current.revision;
         if (mode === 'sqlite') {
-          const saved = await database();
-          if (!saved?.data || !validateData(saved.data))
+          const saved = await database(undefined,'',revision,latest);
+          if (saved && (!saved.data || !validateData(saved.data)))
             throw Error('기존 DB를 확인하지 못해 저장을 중단했습니다.');
-          latest = saved.data;
-          revision = saved.revision;
+          if(saved){latest = saved.data!; revision = saved.revision;}
         } else if (!replacement) latest = browserData();
         const next = removeLegacySamples(
           structuredClone(replacement || latest),
@@ -315,10 +319,13 @@ export function RecruitmentProvider({ children }: { children: ReactNode }) {
             '입력 값이나 데이터 연결이 올바르지 않습니다. 저장하지 않았습니다.',
           );
         if (mode === 'sqlite') {
-          const ack = await database({ data: next, revision, ...(replacement ? { beforeRestore: true } : {}) });
+          let ack: Snapshot | null;
+          if(replacement)ack=await database({data:next,revision,beforeRestore:true});
+          else {try{ack=await database({changes:dataPatch(latest,next),revision},'/patch');}catch(e){if(e instanceof StorageError && e.status===404)ack=await database({data:next,revision});else throw e;}}
           if (!ack) throw Error('DB 저장 결과를 확인하지 못했습니다.');
           revision = ack.revision;
-          if (ack.data && validateData(ack.data)) { Object.assign(next, ack.data); }
+          if(ack.changes)Object.assign(next,applyPatch(latest,ack.changes));
+          else if (ack.data && validateData(ack.data)) { Object.assign(next, ack.data); }
           setBackupWarning(ack.backupWarning || '');
         } else localStorage.setItem(storageKey, JSON.stringify(next));
         adopt(next, revision);

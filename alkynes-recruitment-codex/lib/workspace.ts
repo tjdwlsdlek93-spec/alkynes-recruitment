@@ -26,7 +26,7 @@ export function markNotice(data: RecruitmentData, target: NoticeTarget, audience
   data.sharedNotices = (data.sharedNotices || []).filter(n => !(n.kind === target.kind && n.targetId === target.id && n.audience === audience));
   if (done) {
     const row = target.kind === 'interview' ? data.interviews.find(i => i.id === target.id)! : data.requests!.find(q => q.id === target.id)!;
-    data.sharedNotices.unshift({ id: crypto.randomUUID(), kind: target.kind, targetId: target.id, candidateId: row.candidateId, audience, signature, at: new Date().toISOString() });
+    data.sharedNotices.unshift({ id: crypto.randomUUID(), kind: target.kind, targetId: target.id, candidateId: row.candidateId, audience, signature, ...(audience==='candidate'?{reply:'회신 대기' as const}:{}), at: new Date().toISOString() });
   }
 }
 export function interviewConflicts(data: RecruitmentData, now = Date.now()) {
@@ -86,6 +86,7 @@ export function candidateTimeline(data: RecruitmentData, id: string) {
     for (const e of data.evaluations.filter(e => e.interviewId === i.id)) add(e.id, e.updatedAt, '면접 평가', e.evaluator + ' · ' + e.overall);
   }
   for (const n of data.sharedNotices || []) if (n.candidateId === id) add(n.id, n.at, (n.kind === 'interview' ? '면접' : '인적성') + ' 안내 완료 기록', n.audience === 'candidate' ? '지원자 안내' : '사내 공유');
+  for(const a of data.auditTrail || []) if(a.candidateId===id) add(a.id,a.at,'변경 이력 · '+a.action,a.fields.map(f=>f.field+': '+f.before+' → '+f.after).join('\n'));
   const c = data.candidates.find(c => c.id === id);
   add('expected-join', c?.expectedJoin, '입사 예정'); add('actual-join', c?.actualJoin, '실제 입사');
   for (const run of data.excelRuns || []) for (const [index, change] of run.changes.entries()) if (change.candidateId === id) add(run.id + '-' + index, run.at, '엑셀 반영 · ' + change.label, change.detail);
