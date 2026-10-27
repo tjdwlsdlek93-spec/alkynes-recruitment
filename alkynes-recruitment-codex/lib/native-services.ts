@@ -349,11 +349,13 @@ export function createEntityStore(dataDir: string) {
       const at=new Date().toISOString();
       // Discover prior names in retained copies before scrubbing all managed copies.
       const secrets=[person.name,person.phone,person.email,person.resumeName];
-      for(const row of sql.prepare('SELECT payload FROM history UNION ALL SELECT payload FROM migration_backup').all() as {payload:string}[]){const v=JSON.parse(row.payload);const c=v.candidates?.find((c:{id:string})=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
+      const collect=(v:RecruitmentData)=>{for(const e of v.auditTrail || [])if(e.candidateId===candidateId)for(const f of e.fields)if(['이름','연락처','이메일','이력서 파일명'].includes(f.field))for(const x of [f.before,f.after]){try{const text=JSON.parse(x);if(typeof text==='string')secrets.push(text);}catch{}}};
+      collect(current.data!);
+      for(const row of sql.prepare('SELECT payload FROM history UNION ALL SELECT payload FROM migration_backup').all() as {payload:string}[]){const v=JSON.parse(row.payload);collect(v);const c=v.candidates?.find((c:{id:string})=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
       const files=backupRows().map(r=>path.join(directory(),r.name));
       for(const name of fs.readdirSync(dataDir))if(/^before-entity-migration-.*\.json$/.test(name))files.push(path.join(dataDir,name));
       const copies=files.map(file=>({file,data:JSON.parse(fs.readFileSync(file,'utf8')) as RecruitmentData}));
-      for(const copy of copies){if(!validateData(copy.data))fail(400,'백업 검증 실패. 삭제를 중단했습니다.');const c=copy.data.candidates.find(c=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
+      for(const copy of copies){if(!validateData(copy.data))fail(400,'백업 검증 실패. 삭제를 중단했습니다.');collect(copy.data);const c=copy.data.candidates.find(c=>c.id===candidateId);if(c)secrets.push(c.name,c.phone,c.email,c.resumeName);}
       for(const copy of copies)atomic(copy.file,JSON.stringify(redactPerson(copy.data,candidateId,at,[...secrets])));
       // Legacy SQLite migration images cannot be safely scrubbed in place.
       for(const name of fs.readdirSync(dataDir))if(/^before-entity-migration-.*\.sqlite$/.test(name))fs.unlinkSync(path.join(dataDir,name));

@@ -362,11 +362,12 @@ test('privacy erasure scrubs managed backups and histories, removes PDFs, and ca
   const dir=await temp();let store=services.createEntityStore(dir);
   try {
     const data=seedData(),c=data.candidates[0];c.name='synthetic-private-person';c.phone='010-1111-2222';c.resumeData='data:application/pdf;base64,'+Buffer.from('%PDF-1.4\nprivate synthetic').toString('base64');c.resumeName='private.pdf';
+    data.auditTrail=[{id:'old-name-audit',at:new Date().toISOString(),actor:'검증',entity:c.id,candidateId:c.id,kind:'candidates',action:'수정',fields:[{field:'이름',before:JSON.stringify('synthetic-old-identity'),after:JSON.stringify(c.name)}]}];data.activity.push({id:'old-name-log',at:new Date().toISOString(),actor:'검증',message:'synthetic-old-identity 기록'});
     store.save(data,0);const resume=store.snapshot(true).data.candidates[0].resumeId;store.backup('manual');
     assert.throws(()=>store.erase(c.id,1,'wrong'),/확인 문구/);
     store.erase(c.id,1,'개인정보 삭제');
-    assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');assert.equal(store.attachment(resume),null);
-    for(const row of store.backupRows()){const text=fs.readFileSync(path.join(store.directory(),row.name),'utf8');assert.ok(!text.includes(c.name));assert.ok(!text.includes(c.phone));assert.ok(!text.includes(c.resumeData));}
+    assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');assert.equal(store.attachment(resume),null);assert.ok(!JSON.stringify(store.snapshot(true).data).includes('synthetic-old-identity'));
+    for(const row of store.backupRows()){const text=fs.readFileSync(path.join(store.directory(),row.name),'utf8');assert.ok(!text.includes(c.name));assert.ok(!text.includes('synthetic-old-identity'));assert.ok(!text.includes(c.phone));assert.ok(!text.includes(c.resumeData));}
     const db=new DatabaseSync(path.join(dir,'recruitment.sqlite'));assert.equal(db.prepare('SELECT count(*) AS n FROM attachments').get().n,0);for(const t of ['history','migration_backup'])for(const row of db.prepare('SELECT payload FROM '+t).all())assert.ok(!row.payload.includes(c.name));db.close();
     store.save(data,store.info().revision,{beforeRestore:true});assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');
     store.close();store=services.createEntityStore(dir);store.save(data,store.info().revision);assert.equal(store.snapshot(true).data.candidates[0].resumeId,undefined);assert.equal(store.snapshot(true).data.candidates[0].name,'개인정보 삭제');

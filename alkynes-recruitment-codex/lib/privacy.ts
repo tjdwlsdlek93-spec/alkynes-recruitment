@@ -2,6 +2,7 @@ import type { RecruitmentData } from './recruitment';
 export function redactPerson(value: RecruitmentData, candidateId: string, at: string, secrets: string[] = []) {
   const data=structuredClone(value), c=data.candidates.find(c=>c.id===candidateId);
   if(c) secrets.push(c.name,c.phone,c.email,c.resumeName);
+  for(const entry of data.auditTrail || [])if(entry.candidateId===candidateId)for(const f of entry.fields)if(['이름','연락처','이메일','이력서 파일명'].includes(f.field))for(const v of [f.before,f.after]){try{const parsed=JSON.parse(v);if(typeof parsed==='string')secrets.push(parsed);}catch{}}
   // Scrub historical text as well as the current candidate card. Keep IDs/dates intact.
   const words=[...new Set(secrets.filter(s=>s && s!=='개인정보 삭제' && s.length>=2))].sort((a,b)=>b.length-a.length);
   function scrub(v: unknown, key=''): unknown {
