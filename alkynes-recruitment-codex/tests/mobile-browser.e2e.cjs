@@ -82,6 +82,18 @@ test('acceptance message copies entered date/documents; mobile login shows same 
     const mobileDiagnostics=view.getByLabel('앱 버전 및 진단',{exact:true});if(!await mobileDiagnostics.evaluate(el=>el.open))await mobileDiagnostics.locator('summary').click();
     await view.getByRole('button',{name:'진단정보 복사',exact:true}).click();const diagnostic=await view.evaluate(()=>window.__copiedTest);assert.match(diagnostic,/현재 화면 버전: /);assert.match(diagnostic,/노트북 앱 버전: /);assert.ok(!diagnostic.includes('검증지원자'));
     await view.goto(remoteBase+'/dashboard');
+    // Older/incomplete sync responses must not crash the dashboard or diagnostics.
+    for (const issues of [undefined, null, {}, [null]]) {
+      await view.route('**/__alkynes/sync',route=>route.fulfill({json:{background:true,enabled:true,phase:'idle',message:'호환성 검증',...(issues===undefined?{}:{issues})}}));
+      await view.reload();await view.getByRole('heading',{name:'채용 현황',exact:true}).waitFor();
+      await view.getByLabel('앱 버전 및 진단',{exact:true}).locator('summary').first().click();
+      await view.getByText('서버 자동 연결 · 호환성 검증',{exact:true}).waitFor();
+      await view.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedTest=text;}}});});
+      await view.getByRole('button',{name:'진단정보 복사',exact:true}).click();
+      assert.match(await view.evaluate(()=>window.__copiedTest),Array.isArray(issues)?/입력 점검 건수: 0/:/입력 점검 건수: 확인 불가/);
+      assert.deepEqual(errors,[]);await view.unroute('**/__alkynes/sync');
+    }
+    await view.reload();
     const sessionFooter=view.getByLabel('모바일 접속 관리',{exact:true});await sessionFooter.waitFor();assert.equal(await sessionFooter.getByRole('button',{name:'최신 내용 불러오기',exact:true}).count(),1);assert.equal(await sessionFooter.getByRole('button',{name:'접속 종료',exact:true}).count(),1);
     assert.equal(await sessionFooter.evaluate(el=>el===document.querySelector('main')?.lastElementChild),true);
     await view.screenshot({path:path.join(os.tmpdir(),'alkynes-mobile-dashboard-ui.png'),fullPage:true});

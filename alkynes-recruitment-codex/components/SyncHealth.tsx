@@ -13,6 +13,7 @@ export type SyncStatus = {
   dbRevision: number;
   message: string;
   pending?: {revision:string;removed:number;changed:number;total:number;interviewsRemoved:number;interviewsChanged:number};
+  issuesAvailable?: boolean;
   issues: { row: number; field: string; message: string; severity: string }[];
 };
 export function useSyncHealth() {
@@ -31,7 +32,10 @@ export function useSyncHealth() {
         });
         if (response.ok) {
           const result = await response.json();
-          if (active && result.background) setStatus(result);
+          if (active && result && typeof result === "object" && result.background === true) {
+            const issuesAvailable = Array.isArray(result.issues);
+            setStatus({ ...result, issuesAvailable, issues: issuesAvailable ? result.issues.filter((issue: unknown) => issue && typeof issue === 'object' && typeof (issue as {message?: unknown}).message === 'string') : [] });
+          }
         }
       } catch {
       } finally {
@@ -110,7 +114,8 @@ export function SyncHealth({ compact = false }: { compact?: boolean }) {
           </p>
           {status.phase==='review' && status.pending && !readOnly && <div className="space-y-3 rounded-xl border border-amber-300 bg-amber-50 p-3"><p className="font-bold">대량 변경 적용 보류</p><p className="text-sm">기존 {status.pending.total}명 중 원본 제외 {status.pending.removed}명 · 주요 정보 변경 {status.pending.changed}명 · 면접 제외 {status.pending.interviewsRemoved}건 / 변경 {status.pending.interviewsChanged}건. 엑셀 파일과 내용을 먼저 확인하세요. 승인하면 적용 직전 백업을 남깁니다.</p><button className="btn-secondary" onClick={async()=>{try{const r=await fetch('/__alkynes/sync/approve',{method:'POST',headers:{'X-Alkynes-Client':'1'}});const v=await r.json();if(!r.ok || v.phase==='error')throw Error(v.error || v.message || '승인 실패');setError(v.phase==='review'?'승인 중 원본이 변경되었습니다. 새 변경 내용을 다시 확인하세요.':'승인한 변경을 반영했습니다.');}catch(e){setError((e as Error).message);}}}>변경 내용 확인 · 반영 승인</button></div>}
           <details open={status.issues.length > 0}>
-            <summary>입력 점검 {status.issues.length}건</summary>
+            <summary>입력 점검 {status.issuesAvailable === false ? "확인 불가" : status.issues.length + "건"}</summary>
+            {status.issuesAvailable === false && <p className="mt-2 text-sm text-amber-800">서버 응답에 입력 점검 목록이 없습니다. 노트북 앱 업데이트 후 다시 확인하세요. 채용 데이터는 그대로 유지됩니다.</p>}
             <ul className="mt-3 space-y-2 text-sm">
               {status.issues.map((issue, index) => (
                 <li key={index}>
