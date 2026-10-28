@@ -1,1 +1,1 @@
-{"app": "alkynes-recruitment", "version": "2026.10.28.1", "notes": "모바일 연동 점검 목록 누락 시 length 오류 방지 및 진단 호환성 개선"}
+{"app": "alkynes-recruitment", "version": "2026.10.28.2", "notes": "이전 모바일 서버와 자동 실행 충돌 복구, 포트 점유 원인 안내 및 접속 주소 통일"}

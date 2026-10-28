@@ -190,8 +190,93 @@ async function main() {
     await start(root, mode === 'start');
   } else throw Error('지원하지 않는 실행 옵션입니다.');
 }
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   logError(source, error);
   console.error(error.message);
   process.exitCode = 1;
 });
+
+
+// Retire only the confirmed legacy mobile entry point owned by this Windows user.
+function legacyRepairScript(dataDir) {
+  return String.raw`$ErrorActionPreference='Stop'
+$runtime=${quotePS(process.execPath)}
+$codex=[IO.Path]::Combine([Environment]::GetFolderPath('MyDocuments'),'Codex')
+$backup=${quotePS(path.join(dataDir,'legacy-mobile-recovery'))}
+New-Item -ItemType Directory -Force -Path $backup | Out-Null
+$stopped=0; $disabled=0; $failures=0
+function IsLegacy([string]$text) {
+  if(!$text){return $false}
+  $expanded=$text
+  if($text -match '(?i)-EncodedCommand\s+([A-Za-z0-9+/=]+)') {
+    try {$expanded+=' '+[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))} catch {}
+  }
+  return $expanded.IndexOf($runtime,[StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+    $expanded.IndexOf($codex+'\',[StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+    $expanded -match '(?i)\\outputs\\mobile\\mobile-background\.cjs(?:["''\s]|$)'
+}
+$me=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$w=New-Object -ComObject WScript.Shell
+$startup=[Environment]::GetFolderPath('Startup')
+foreach($file in @(Get-ChildItem -LiteralPath $startup -Filter '*.lnk' -ErrorAction SilentlyContinue)){
+  try{
+    $link=$w.CreateShortcut($file.FullName)
+    if(IsLegacy ($link.TargetPath+' '+$link.Arguments)){
+      Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $backup ([Guid]::NewGuid().ToString()+'-'+$file.Name)) -Force
+      Remove-Item -LiteralPath $file.FullName; $disabled++
+    }
+  }catch{$failures++}
+}
+try{
+  foreach($task in @(Get-ScheduledTask -ErrorAction Stop)){
+    $principal=$task.Principal.UserId
+    try {if($principal -notmatch '^S-1-'){ $principal=([Security.Principal.NTAccount]$principal).Translate([Security.Principal.SecurityIdentifier]).Value }}catch{continue}
+    if($principal -ne $me){continue}
+    $actions=@($task.Actions)
+    if($actions.Count -ne 1 -or $task.State -eq 'Disabled'){continue}
+    if(IsLegacy ($actions[0].Execute+' '+$actions[0].Arguments)){
+      try{
+        $xml=Export-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath
+        $key=[Guid]::NewGuid().ToString()+'.xml'
+        [IO.File]::WriteAllText((Join-Path $backup $key),$xml)
+        Disable-ScheduledTask -TaskName $task.TaskName -TaskPath $task.TaskPath | Out-Null; $disabled++
+      }catch{$failures++}
+    }
+  }
+}catch{$failures++}
+$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+try{
+  $values=Get-ItemProperty -LiteralPath $run -ErrorAction Stop
+  foreach($item in $values.PSObject.Properties){
+    if($item.Name -like 'PS*' -or $item.Value -isnot [string] -or !(IsLegacy $item.Value)){continue}
+    @{name=$item.Name;value=$item.Value} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $backup ([Guid]::NewGuid().ToString()+'.json')) -Encoding UTF8
+    Remove-ItemProperty -LiteralPath $run -Name $item.Name; $disabled++
+  }
+}catch{if(Test-Path -LiteralPath $run){$failures++}}
+$processes=@(Get-CimInstance Win32_Process -Filter "Name='node.exe'")
+foreach($p in $processes){
+  if($p.ExecutablePath -ine $runtime -or !(IsLegacy $p.CommandLine)){continue}
+  try {
+    $owner=Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid
+    if($owner.Sid -ne $me){continue}
+    # Re-read PID immediately before stopping to reduce process-reuse risk.
+    $live=Get-CimInstance Win32_Process -Filter ("ProcessId="+$p.ProcessId)
+    if($live.CreationDate -eq $p.CreationDate -and $live.ExecutablePath -ieq $runtime -and (IsLegacy $live.CommandLine)){
+      Stop-Process -Id $live.ProcessId -ErrorAction Stop; $stopped++
+    }
+  }catch{$failures++}
+}
+@{stopped=$stopped;disabled=$disabled;failures=$failures} | ConvertTo-Json -Compress
+`;
+}
+function repairLegacyMobile(dataDir) {
+  if(process.platform!=='win32') return Promise.resolve({stopped:0,disabled:0,failures:0,unsupported:true});
+  return new Promise((resolve,reject)=>{
+    const child=spawn('powershell.exe',['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(legacyRepairScript(dataDir),'utf16le').toString('base64')],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+    let output='';const timer=setTimeout(()=>{child.kill();reject(Error('이전 모바일 서버 정리 시간이 초과되었습니다.'));},20000);
+    child.stdout.on('data',chunk=>{output+=chunk;if(output.length>16384)child.kill();});child.stderr.resume();
+    child.on('error',e=>{clearTimeout(timer);reject(e);});
+    child.on('close',code=>{clearTimeout(timer);try{if(code!==0)throw Error('이전 모바일 서버 정리를 완료하지 못했습니다.');resolve(JSON.parse(output.trim()));}catch(e){reject(e);}});
+  });
+}
+module.exports={repairLegacyMobile,legacyRepairScript};

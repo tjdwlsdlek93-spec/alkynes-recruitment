@@ -333,22 +333,37 @@ function createMobileHandler({ host, localPort, passwordHash, salt }) {
     res.on('close',()=>upstream.destroy());upstream.end();
   };
 }
-function createMobileAccess({port,dataDir}) {
+function createMobileAccess({port,dataDir,repairLegacy=require('./setup.cjs').repairLegacyMobile,platform=process.platform,addresses=mobileAddresses,createListener=handler=>require('node:http').createServer(handler)}) {
   const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto');
   const configFile=path.join(dataDir,'mobile-access.json'),mobilePort=port+1;
-  let config={enabled:false},listener=null,error='',starting=false;
+  let config={enabled:false},listener=null,error='',starting=false,recovering=false,recoveryTried=false,recoveryMessage='',closed=false;
   try{config=JSON.parse(fs.readFileSync(configFile,'utf8'));}catch{}
-  const status=()=>({enabled:config.enabled===true,connected:!!listener?.listening,address:config.address || '',port:mobilePort,addresses:mobileAddresses(),url:listener?.listening?'http://'+config.address+':'+mobilePort:'',error});
+  const status=()=>({enabled:config.enabled===true,connected:!!listener?.listening,address:config.address || '',port:mobilePort,addresses:addresses(),url:listener?.listening?'http://'+config.address+':'+mobilePort+'/dashboard':'',error,recovering,recoveryMessage});
   function start() {
-    if(!config.enabled || listener || starting)return;
-    if(!isTailnetIPv4(config.address) || !mobileAddresses().includes(config.address)) {error='Tailscale 연결을 확인하세요. 연결되면 자동으로 다시 시도합니다.';return;}
+    if(closed || recovering || !config.enabled || listener || starting)return;
+    if(!isTailnetIPv4(config.address) || !addresses().includes(config.address)) {error='Tailscale 연결을 확인하세요. 연결되면 자동으로 다시 시도합니다.';return;}
     if(!/^[a-f0-9]{64}$/.test(config.passwordHash || '') || !/^[a-f0-9]{32}$/.test(config.salt || '')) {error='접속 비밀번호를 다시 설정해 주세요.';return;}
+    if(platform==='win32' && !recoveryTried){void recover();return;}
     starting=true;
-    const instance=http.createServer(createMobileHandler({host:config.address+':'+mobilePort,localPort:port,passwordHash:config.passwordHash,salt:config.salt}));
+    const instance=createListener(createMobileHandler({host:config.address+':'+mobilePort,localPort:port,passwordHash:config.passwordHash,salt:config.salt}));
     listener=instance;
     instance.requestTimeout=20000;instance.headersTimeout=10000;
-    instance.on('error',()=>{if(listener===instance)listener=null;starting=false;error='휴대폰 접속 포트를 열지 못했습니다. VPN과 포트 사용 여부를 확인하세요.';});
+    instance.on('error',e=>{
+      if(listener===instance)listener=null;starting=false;
+      error=e.code==='EADDRINUSE'?'이전 서버 또는 다른 프로그램이 휴대폰 포트를 사용 중입니다. 연결 복구를 실행하세요.':'휴대폰 접속 포트를 열지 못했습니다. Tailscale 주소와 연결 상태를 확인하세요.';
+      if(e.code==='EADDRINUSE' && !recoveryTried)void recover();
+    });
     instance.listen(mobilePort,config.address,()=>{starting=false;error='';});
+  }
+  async function recover(){
+    if(recovering || closed)return;
+    recovering=true;recoveryTried=true;recoveryMessage='이전 모바일 서버와 자동 실행 등록을 확인하고 있습니다.';
+    try{
+      const result=await repairLegacy(dataDir);
+      recoveryMessage=result.unsupported?'Windows 노트북에서 연결을 복구할 수 있습니다.':`이전 서버 ${result.stopped}개 종료 · 자동 실행 ${result.disabled}개 해제${result.failures?' · 일부 항목 정리 실패: Windows 권한 확인 필요':''}`;
+      if(!closed){stop();error='';}
+    }catch(e){recoveryMessage='복구 실패: '+e.message;}
+    finally{recovering=false;if(!closed)start();}
   }
   function stop(){const old=listener;listener=null;starting=false;if(old){old.close();old.closeAllConnections();}}
   const timer=setInterval(start,30000);timer.unref();start();
@@ -362,9 +377,10 @@ function createMobileAccess({port,dataDir}) {
     try {
       let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>4096)return send(413,{error:'입력 길이를 확인하세요.'});chunks.push(chunk);}
       const body=JSON.parse(Buffer.concat(chunks));
+      if(body.action==='repair'){await recover();return send(200,status());}
       let next={...config,enabled:body.enabled===true};
       if(next.enabled){
-        if(!isTailnetIPv4(body.address) || !mobileAddresses().includes(body.address))return send(400,{error:'이 노트북의 연결된 Tailscale IPv4를 선택해 주세요.'});
+        if(!isTailnetIPv4(body.address) || !addresses().includes(body.address))return send(400,{error:'이 노트북의 연결된 Tailscale IPv4를 선택해 주세요.'});
         next.address=body.address;
         if(body.password){if(typeof body.password!=='string' || body.password.length<12 || body.password.length>200)return send(400,{error:'비밀번호는 12~200자로 설정해 주세요.'});next.salt=crypto.randomBytes(16).toString('hex');next.passwordHash=crypto.scryptSync(body.password,next.salt,32).toString('hex');}
         if(!next.passwordHash)return send(400,{error:'최초 연결 시 접속 비밀번호가 필요합니다.'});
@@ -373,7 +389,7 @@ function createMobileAccess({port,dataDir}) {
       stop();config=next;error='';start();return send(200,status());
     }catch{return send(400,{error:'접속 설정을 저장하지 못했습니다.'});}
   }
-  handle.close=()=>{clearInterval(timer);stop();};return handle;
+  handle.close=()=>{closed=true;clearInterval(timer);stop();};return handle;
 }
 
 function startServer() {
