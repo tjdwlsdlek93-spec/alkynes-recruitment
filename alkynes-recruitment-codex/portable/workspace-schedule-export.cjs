@@ -17,6 +17,17 @@ function exportSchedule(dbPath,outputDir){
     const row=db.prepare('SELECT payload FROM workspace WHERE id=1').get();
     if(!row)throw Error('채용관리 데이터가 아직 저장되지 않았습니다.');
     data=JSON.parse(row.payload);
+    if(data&&data.storageSchema===2&&Array.isArray(data.fields)){
+      // Current Windows app stores individual entities in records; workspace.payload
+      // contains only the schema marker. Mirror native-services.ts snapshot() read path.
+      const required=['interviews','candidates','requisitions'];
+      const missing=required.filter(k=>!data.fields.includes(k));
+      if(missing.length)throw Error('채용관리 분리형 저장소에 필수 필드가 없습니다: '+missing.join(', '));
+      const hydrated={version:1};
+      const stmt=db.prepare('SELECT payload FROM records WHERE kind=? ORDER BY position');
+      for(const kind of required)hydrated[kind]=stmt.all(kind).map(x=>JSON.parse(String(x.payload)));
+      data=hydrated;
+    }
   } finally {db.close();}
   if(!data||typeof data!=='object'||!Array.isArray(data.interviews)||!Array.isArray(data.candidates)||!Array.isArray(data.requisitions)){
     // Diagnostics contain field names and container types only. Never print stored applicant values.
