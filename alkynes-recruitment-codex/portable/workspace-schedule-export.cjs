@@ -9,7 +9,7 @@ const {DatabaseSync}=require('node:sqlite');
 
 function exportSchedule(dbPath,outputDir){
   if(!path.isAbsolute(outputDir))throw Error('동기화 폴더는 절대 경로여야 합니다.');
-  if(!fs.statSync(outputDir).isDirectory())throw Error('동기화 폴더가 존재하지 않습니다.');
+  if(!fs.existsSync(outputDir)||!fs.statSync(outputDir).isDirectory())throw Error('동기화 폴더가 존재하지 않습니다: '+outputDir);
   if(!fs.existsSync(dbPath))throw Error('채용관리 DB가 없습니다. 앱을 먼저 실행하세요.');
   const db=new DatabaseSync(dbPath,{readOnly:true});
   let data;
@@ -39,7 +39,7 @@ function exportSchedule(dbPath,outputDir){
 if(require.main===module){
   const outputDir=process.argv[2];
   if(!outputDir){console.error('사용법: node portable/workspace-schedule-export.cjs "Google Drive 동기화 폴더 경로"');process.exit(2);}
-  const dataDir=process.env.ALKYNES_DATA_DIR||path.join(__dirname,'config');
+  const dataDir=process.env.ALKYNES_DATA_DIR||(process.platform==='win32'&&process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'AlkynesRecruitment','config'):path.join(__dirname,'config'));
   const db=path.join(dataDir,'recruitment.sqlite');
   const tick=()=>{try{const v=exportSchedule(db,outputDir);console.log('면접 일정 동기화 준비:',v.count,'건',v.at)}catch(e){console.error('일정 동기화 실패:',e.message)}};
   tick();
