@@ -1,0 +1,48 @@
+'use strict';
+// Optional local-only export for SEONGJIN MIN WORKSPACE.
+// Prerequisite: Google Drive for desktop sync folder; no remote API access, no credentials.
+// Run: node portable/workspace-schedule-export.cjs "G:\\My Drive\\SEONGJIN-SYNC"
+// Exports ONLY interview ID, title, ISO time, status; no phone, email, resume, notes, evaluation.
+const fs=require('node:fs');
+const path=require('node:path');
+const {DatabaseSync}=require('node:sqlite');
+
+function exportSchedule(dbPath,outputDir){
+  if(!path.isAbsolute(outputDir))throw Error('동기화 폴더는 절대 경로여야 합니다.');
+  if(!fs.statSync(outputDir).isDirectory())throw Error('동기화 폴더가 존재하지 않습니다.');
+  if(!fs.existsSync(dbPath))throw Error('채용관리 DB가 없습니다. 앱을 먼저 실행하세요.');
+  const db=new DatabaseSync(dbPath,{readOnly:true});
+  let data;
+  try{
+    const row=db.prepare('SELECT payload FROM workspace WHERE id=1').get();
+    if(!row)throw Error('채용관리 데이터가 아직 저장되지 않았습니다.');
+    data=JSON.parse(row.payload);
+  } finally {db.close();}
+  if(!Array.isArray(data.interviews)||!Array.isArray(data.candidates)||!Array.isArray(data.requisitions))throw Error('채용관리 데이터 형식 오류');
+  const people=new Map(data.candidates.map(x=>[x.id,x]));
+  const jobs=new Map(data.requisitions.map(x=>[x.id,x]));
+  const items=data.interviews.filter(i=>i&&i.id&&i.startsAt&&i.status!=='취소').map(i=>{
+    const c=people.get(i.candidateId);
+    const job=c?jobs.get(c.requisitionId):null;
+    if(!c||!job||c.privacyErasedAt||c.excelMissing||job.excelMissing)return null;
+    const when=new Date(i.startsAt);
+    if(!Number.isFinite(when.getTime()))return null;
+    const part=[String(job.department||job.role||'채용').trim(),String(c.name||'지원자').trim()+' 면접'];
+    return {id:String(i.id).slice(0,150),title:part.join(' · ').slice(0,250),startsAt:when.toISOString(),status:['면접예정','면접완료','확인 필요'].includes(i.status)?i.status:'확인 필요'};
+  }).filter(Boolean);
+  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items};
+  const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
+  // Google Drive for desktop observes updates to the same path.
+  fs.writeFileSync(target,JSON.stringify(payload,null,2),'utf8');
+  return {file:target,count:items.length,at:payload.generatedAt};
+}
+if(require.main===module){
+  const outputDir=process.argv[2];
+  if(!outputDir){console.error('사용법: node portable/workspace-schedule-export.cjs "Google Drive 동기화 폴더 경로"');process.exit(2);}
+  const dataDir=process.env.ALKYNES_DATA_DIR||path.join(__dirname,'config');
+  const db=path.join(dataDir,'recruitment.sqlite');
+  const tick=()=>{try{const v=exportSchedule(db,outputDir);console.log('면접 일정 동기화 준비:',v.count,'건',v.at)}catch(e){console.error('일정 동기화 실패:',e.message)}};
+  tick();
+  setInterval(tick,60000);
+}
+module.exports={exportSchedule};
