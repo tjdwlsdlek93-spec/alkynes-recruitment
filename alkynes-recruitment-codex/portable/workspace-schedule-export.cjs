@@ -18,7 +18,12 @@ function exportSchedule(dbPath,outputDir){
     if(!row)throw Error('채용관리 데이터가 아직 저장되지 않았습니다.');
     data=JSON.parse(row.payload);
   } finally {db.close();}
-  if(!Array.isArray(data.interviews)||!Array.isArray(data.candidates)||!Array.isArray(data.requisitions))throw Error('채용관리 데이터 형식 오류');
+  if(!data||typeof data!=='object'||!Array.isArray(data.interviews)||!Array.isArray(data.candidates)||!Array.isArray(data.requisitions)){
+    // Diagnostics contain field names and container types only. Never print stored applicant values.
+    const shape=x=>x===null?'null':Array.isArray(x)?'배열':typeof x;
+    const keys=data&&typeof data==='object'?Object.keys(data).slice(0,25).join(', '):'(객체 아님)';
+    throw Error('채용관리 데이터 형식 오류. 최상위 필드명: ['+keys+']; 필수 배열 상태: interviews='+shape(data?.interviews)+', candidates='+shape(data?.candidates)+', requisitions='+shape(data?.requisitions)+'. 개인정보 값은 표시하지 않습니다.');
+  }
   const people=new Map(data.candidates.map(x=>[x.id,x]));
   const jobs=new Map(data.requisitions.map(x=>[x.id,x]));
   const items=data.interviews.filter(i=>i&&i.id&&i.startsAt&&i.status!=='취소').map(i=>{
