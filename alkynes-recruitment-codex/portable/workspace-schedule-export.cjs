@@ -58,28 +58,42 @@ function exportSchedule(dbPath,outputDir){
   // processes, not all job vacancies. Include interviews and aptitude exams.
   // Honour candidate's terminal Excel status even if old process records remain.
   const requests=Array.isArray(data.requests)?data.requests:[];
+  // Mirror lib/recruitment-view.ts requestedPeople(): the recruitment
+  // dashboard's "전형 요청자 (진행중 채용)" counts requested applicants
+  // based on a received request, NOT on whether an exam/meeting date exists.
+  // Each active candidate is exported exactly once.
+  const requestedIds=new Set(requests.filter(q=>q&&q.candidateId&&
+    ['인적성 검사 요청','면접 요청'].includes(q.stage)&&
+    q.status!=='취소'&&q.receivedAt).map(q=>q.candidateId));
   const inProgressCandidates=data.candidates.filter(c=>{
-    const job=jobs.get(c.requisitionId);
-    return c&&c.id&&!c.excelMissing&&!c.privacyErasedAt&&job&&!job.excelMissing&&!closed.has(job.status)&&!isEnded(c);
+    const job=c?jobs.get(c.requisitionId):null;
+    return !!c&&!!c.id&&!!job&&requestedIds.has(c.id)&&
+      !c.excelMissing&&!c.privacyErasedAt&&!job.excelMissing&&
+      !closed.has(job.status)&&!isEnded(c);
   }).map(c=>{
     const job=jobs.get(c.requisitionId);
-    const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
+    // A scheduled interview takes priority when an interview record exists;
+    // a pending aptitude request remains visible before examAt is entered.
+    const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&
+      i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
       .sort((a,b)=>Date.parse(b.startsAt)-Date.parse(a.startsAt))[0];
-    // The recruitment app calendar also reads candidate.examDates when no
-    // matching dated aptitude request is present (lib/scheduling.ts).
-    const aptitudeRequests=requests.filter(q=>q&&q.candidateId===c.id&&q.stage==='인적성 검사 요청'&&
-      q.status!=='취소'&&q.examStatus!=='실시완료');
-    const aptitude=aptitudeRequests.filter(q=>q.examAt&&Number.isFinite(Date.parse(q.examAt)))
+    const aptitudeRequests=requests.filter(q=>q&&q.candidateId===c.id&&
+      q.stage==='인적성 검사 요청'&&q.status!=='취소'&&
+      q.examStatus!=='실시완료'&&q.receivedAt);
+    const datedAptitude=aptitudeRequests.filter(q=>q.examAt&&Number.isFinite(Date.parse(q.examAt)))
       .sort((a,b)=>Date.parse(b.examAt)-Date.parse(a.examAt))[0];
-    const fallbackDates=Array.isArray(c.examDates)?c.examDates.filter(d=>Number.isFinite(Date.parse(d))):[];
+    const fallbackDates=Array.isArray(c.examDates)?
+      c.examDates.filter(d=>Number.isFinite(Date.parse(d))):[];
     const fallbackAt=fallbackDates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0]||'';
-    const examAt=aptitude?.examAt||fallbackAt;
-    // A requested aptitude exam is IN PROGRESS even before its date is set.
-    // Example: status='요청 완료', examStatus='미실시', examAt=''.
-    // Never invent an exam date; leave interviewAt empty for an undated exam.
-    const pendingAptitude=aptitudeRequests.length>0;
+    const examAt=datedAptitude?.examAt||fallbackAt;
+    const lastInterviewRequest=requests.filter(q=>q&&q.candidateId===c.id&&
+      q.stage==='면접 요청'&&q.status!=='취소'&&q.receivedAt)
+      .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)))[0];
+    // No synthetic exam/meeting dates. A request awaiting scheduling is still
+    // an active IN PROGRESS card with a blank date.
     const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:
-      (pendingAptitude||examAt)?{status:'인적성 검사예정',at:examAt||'',href:'/aptitudes'}:null;
+      aptitudeRequests.length?{status:'인적성 검사예정',at:examAt,href:'/aptitudes'}:
+      lastInterviewRequest?{status:'면접예정',at:'',href:'/interviews?candidate='}:null;
     if(!process)return null;
     return {
       id:String(c.id).slice(0,150),
@@ -100,14 +114,14 @@ function exportSchedule(dbPath,outputDir){
   const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
   // Google Drive for desktop observes updates to the same path.
   fs.writeFileSync(target,JSON.stringify(payload,null,2),'utf8');
-  return {file:target,count:items.length,at:payload.generatedAt};
+  return {file:target,count:items.length,applicants:inProgressCandidates.length,at:payload.generatedAt};
 }
 if(require.main===module){
   const outputDir=process.argv[2];
   if(!outputDir){console.error('사용법: node portable/workspace-schedule-export.cjs "Google Drive 동기화 폴더 경로"');process.exit(2);}
   const dataDir=process.env.ALKYNES_DATA_DIR||(process.platform==='win32'&&process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'AlkynesRecruitment','config'):path.join(__dirname,'config'));
   const db=path.join(dataDir,'recruitment.sqlite');
-  const tick=()=>{try{const v=exportSchedule(db,outputDir);console.log('면접 일정 동기화 준비:',v.count,'건',v.at)}catch(e){console.error('일정 동기화 실패:',e.message)}};
+  const tick=()=>{try{const v=exportSchedule(db,outputDir);console.log('채용관리 동기화:',v.applicants,'명 · 면접 일정',v.count,'건',v.at)}catch(e){console.error('일정 동기화 실패:',e.message)}};
   tick();
   setInterval(tick,30000);
 }
