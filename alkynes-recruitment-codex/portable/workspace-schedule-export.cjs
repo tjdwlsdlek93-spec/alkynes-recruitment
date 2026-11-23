@@ -74,8 +74,12 @@ function exportSchedule(dbPath,outputDir){
     const fallbackDates=Array.isArray(c.examDates)?c.examDates.filter(d=>Number.isFinite(Date.parse(d))):[];
     const fallbackAt=fallbackDates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0]||'';
     const examAt=aptitude?.examAt||fallbackAt;
-    const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:examAt?
-      {status:'인적성 검사예정',at:examAt,href:'/aptitudes'}:null;
+    // A requested aptitude exam is IN PROGRESS even before its date is set.
+    // Example: status='요청 완료', examStatus='미실시', examAt=''.
+    // Never invent an exam date; leave interviewAt empty for an undated exam.
+    const pendingAptitude=aptitudeRequests.length>0;
+    const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:
+      (pendingAptitude||examAt)?{status:'인적성 검사예정',at:examAt||'',href:'/aptitudes'}:null;
     if(!process)return null;
     return {
       id:String(c.id).slice(0,150),
@@ -84,10 +88,14 @@ function exportSchedule(dbPath,outputDir){
       role:String(job.role||'').slice(0,150),
       requisitionId:String(job.id).slice(0,150),
       status:process.status,
-      interviewAt:new Date(process.at).toISOString(),
+      interviewAt:process.at?new Date(process.at).toISOString():'',
       processPath:process.href
     };
-  }).filter(Boolean).sort((a,b)=>b.interviewAt.localeCompare(a.interviewAt));
+  }).filter(Boolean).sort((a,b)=>{
+    if(!a.interviewAt)return b.interviewAt?1:a.name.localeCompare(b.name,'ko');
+    if(!b.interviewAt)return -1;
+    return b.interviewAt.localeCompare(a.interviewAt);
+  });
   const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgressCandidates};
   const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
   // Google Drive for desktop observes updates to the same path.
