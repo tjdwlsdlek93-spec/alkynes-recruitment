@@ -46,7 +46,20 @@ function exportSchedule(dbPath,outputDir){
     const part=[String(job.department||job.role||'채용').trim(),String(c.name||'지원자').trim()+' 면접'];
     return {id:String(i.id).slice(0,150),title:part.join(' · ').slice(0,250),startsAt:when.toISOString(),status:['면접예정','면접완료','확인 필요'].includes(i.status)?i.status:'확인 필요'};
   }).filter(Boolean);
-  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items};
+  // Same active-requisition rule as lib/recruitment-view.ts closedJob().
+  // Export job-level information only; do not export candidate personal details.
+  const closed=new Set(['채용완료','채용취소','자체종결','채용보류']);
+  const inProgress=data.requisitions
+    .filter(job=>job&&job.id&&!job.excelMissing&&!closed.has(job.status))
+    .map(job=>({
+      id:String(job.id).slice(0,150),
+      code:String(job.code||'').slice(0,80),
+      department:String(job.department||'').slice(0,100),
+      role:String(job.role||'').slice(0,150),
+      status:String(job.status||'').slice(0,80),
+      targetJoin:String(job.targetJoin||'').slice(0,30)
+    }));
+  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgress};
   const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
   // Google Drive for desktop observes updates to the same path.
   fs.writeFileSync(target,JSON.stringify(payload,null,2),'utf8');
