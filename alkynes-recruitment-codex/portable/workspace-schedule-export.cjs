@@ -46,20 +46,32 @@ function exportSchedule(dbPath,outputDir){
     const part=[String(job.department||job.role||'채용').trim(),String(c.name||'지원자').trim()+' 면접'];
     return {id:String(i.id).slice(0,150),title:part.join(' · ').slice(0,250),startsAt:when.toISOString(),status:['면접예정','면접완료','확인 필요'].includes(i.status)?i.status:'확인 필요'};
   }).filter(Boolean);
-  // Same active-requisition rule as lib/recruitment-view.ts closedJob().
-  // Export job-level information only; do not export candidate personal details.
+  // The recruitment app's IN PROGRESS people view is distinct from job vacancies.
+  // Export only candidates with an active, not-cancelled scheduled interview.
+  // Do not exclude past dates: a past appointment still labelled 면접예정 stays visible.
+  // No phone, email, resume, notes, or evaluation leaves the PC.
   const closed=new Set(['채용완료','채용취소','자체종결','채용보류']);
-  const inProgress=data.requisitions
-    .filter(job=>job&&job.id&&!job.excelMissing&&!closed.has(job.status))
-    .map(job=>({
-      id:String(job.id).slice(0,150),
-      code:String(job.code||'').slice(0,80),
+  const ended=new Set(['서류불합격','불합격','지원포기','입사포기','실제 입사','전형종료']);
+  const inProgressCandidates=data.candidates.filter(c=>{
+    const job=jobs.get(c.requisitionId);
+    return c&&c.id&&!c.excelMissing&&!c.privacyErasedAt&&job&&!job.excelMissing&&!closed.has(job.status)&&
+      !ended.has(c.status)&&!ended.has(c.excelFinal)&&!c.actualJoin;
+  }).map(c=>{
+    const job=jobs.get(c.requisitionId);
+    const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
+      .sort((a,b)=>Date.parse(b.startsAt)-Date.parse(a.startsAt))[0];
+    if(!interview)return null;
+    return {
+      id:String(c.id).slice(0,150),
+      name:String(c.name||'지원자').slice(0,100),
       department:String(job.department||'').slice(0,100),
       role:String(job.role||'').slice(0,150),
-      status:String(job.status||'').slice(0,80),
-      targetJoin:String(job.targetJoin||'').slice(0,30)
-    }));
-  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgress};
+      requisitionId:String(job.id).slice(0,150),
+      status:'면접예정',
+      interviewAt:new Date(interview.startsAt).toISOString()
+    };
+  }).filter(Boolean).sort((a,b)=>b.interviewAt.localeCompare(a.interviewAt));
+  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgressCandidates};
   const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
   // Google Drive for desktop observes updates to the same path.
   fs.writeFileSync(target,JSON.stringify(payload,null,2),'utf8');
