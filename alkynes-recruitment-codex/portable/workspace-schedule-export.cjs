@@ -112,7 +112,7 @@ function exportSchedule(dbPath,outputDir){
     if(!b.interviewAt)return -1;
     return b.interviewAt.localeCompare(a.interviewAt);
   });
-  const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgressCandidates};
+  const payload={version:1,exporterVersion:3,generatedAt:new Date().toISOString(),interviews:items,inProgressCandidates};
   const target=path.join(outputDir,'seongjin-recruitment-schedule.json');
   // Google Drive for desktop observes updates to the same path.
   fs.writeFileSync(target,JSON.stringify(payload,null,2),'utf8');
