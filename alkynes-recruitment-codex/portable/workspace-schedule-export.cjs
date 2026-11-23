@@ -77,22 +77,24 @@ function exportSchedule(dbPath,outputDir){
     const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&
       i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
       .sort((a,b)=>Date.parse(b.startsAt)-Date.parse(a.startsAt))[0];
+    // Keep ALL non-cancelled aptitude requests, including completed exams.
+    // examStatus (실시완료) is independent of the request status (요청 완료).
     const aptitudeRequests=requests.filter(q=>q&&q.candidateId===c.id&&
-      q.stage==='인적성 검사 요청'&&q.status!=='취소'&&
-      q.examStatus!=='실시완료'&&q.receivedAt);
-    const datedAptitude=aptitudeRequests.filter(q=>q.examAt&&Number.isFinite(Date.parse(q.examAt)))
-      .sort((a,b)=>Date.parse(b.examAt)-Date.parse(a.examAt))[0];
+      q.stage==='인적성 검사 요청'&&q.status!=='취소'&&q.receivedAt)
+      .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)));
+    const aptitude=aptitudeRequests[0];
     const fallbackDates=Array.isArray(c.examDates)?
       c.examDates.filter(d=>Number.isFinite(Date.parse(d))):[];
     const fallbackAt=fallbackDates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0]||'';
-    const examAt=datedAptitude?.examAt||fallbackAt;
+    const examAt=aptitude?.examAt&&Number.isFinite(Date.parse(aptitude.examAt))?
+      aptitude.examAt:fallbackAt;
     const lastInterviewRequest=requests.filter(q=>q&&q.candidateId===c.id&&
       q.stage==='면접 요청'&&q.status!=='취소'&&q.receivedAt)
       .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)))[0];
-    // No synthetic exam/meeting dates. A request awaiting scheduling is still
-    // an active IN PROGRESS card with a blank date.
+    // An upcoming interview overrides an aptitude card. Otherwise transmit
+    // the real exam state instead of hard-coding every applicant as "예정".
     const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:
-      aptitudeRequests.length?{status:'인적성 검사예정',at:examAt,href:'/aptitudes'}:
+      aptitude?{status:aptitude.examStatus==='실시완료'?'인적성 응시 완료':'인적성 검사예정',at:examAt||'',href:'/aptitudes'}:
       lastInterviewRequest?{status:'면접예정',at:'',href:'/interviews?candidate='}:null;
     if(!process)return null;
     return {
