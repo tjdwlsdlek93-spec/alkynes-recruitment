@@ -84,6 +84,6 @@ if(require.main===module){
   const db=path.join(dataDir,'recruitment.sqlite');
   const tick=()=>{try{const v=exportSchedule(db,outputDir);console.log('면접 일정 동기화 준비:',v.count,'건',v.at)}catch(e){console.error('일정 동기화 실패:',e.message)}};
   tick();
-  setInterval(tick,60000);
+  setInterval(tick,30000);
 }
 module.exports={exportSchedule};
