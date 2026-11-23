@@ -65,11 +65,17 @@ function exportSchedule(dbPath,outputDir){
     const job=jobs.get(c.requisitionId);
     const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
       .sort((a,b)=>Date.parse(b.startsAt)-Date.parse(a.startsAt))[0];
-    const aptitude=requests.filter(q=>q&&q.candidateId===c.id&&q.stage==='인적성 검사 요청'&&
-      q.status!=='취소'&&q.examStatus!=='실시완료'&&q.examAt&&Number.isFinite(Date.parse(q.examAt)))
+    // The recruitment app calendar also reads candidate.examDates when no
+    // matching dated aptitude request is present (lib/scheduling.ts).
+    const aptitudeRequests=requests.filter(q=>q&&q.candidateId===c.id&&q.stage==='인적성 검사 요청'&&
+      q.status!=='취소'&&q.examStatus!=='실시완료');
+    const aptitude=aptitudeRequests.filter(q=>q.examAt&&Number.isFinite(Date.parse(q.examAt)))
       .sort((a,b)=>Date.parse(b.examAt)-Date.parse(a.examAt))[0];
-    const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:aptitude?
-      {status:'인적성 검사예정',at:aptitude.examAt,href:'/aptitudes'}:null;
+    const fallbackDates=Array.isArray(c.examDates)?c.examDates.filter(d=>Number.isFinite(Date.parse(d))):[];
+    const fallbackAt=fallbackDates.sort((a,b)=>Date.parse(b)-Date.parse(a))[0]||'';
+    const examAt=aptitude?.examAt||fallbackAt;
+    const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:examAt?
+      {status:'인적성 검사예정',at:examAt,href:'/aptitudes'}:null;
     if(!process)return null;
     return {
       id:String(c.id).slice(0,150),
