@@ -18,5 +18,12 @@ export function candidateStatus(candidate: Pick<Candidate, 'status' | 'excelFina
   return result || (compact(candidate.excelStage) === '전형종료' ? '전형종료' : candidate.status);
 }
 export function endedCandidate(candidate: Candidate) {
-  return ['서류불합격', '불합격', '지원포기', '입사포기', '실제 입사', '전형종료'].includes(candidateStatus(candidate));
+  // The interview may still be marked '면접예정' after an Excel import closes the
+  // applicant. Treat any terminal source field as authoritative for exclusion.
+  const terminal = ['서류불합격', '불합격', '지원포기', '입사포기', '실제 입사', '전형종료'];
+  const excelFinal = finalStatus(candidate.excelFinal);
+  return terminal.includes(candidateStatus(candidate)) ||
+    terminal.includes(candidate.status) ||
+    (!!excelFinal && terminal.includes(excelFinal)) ||
+    compact(candidate.excelStage) === '전형종료';
 }
