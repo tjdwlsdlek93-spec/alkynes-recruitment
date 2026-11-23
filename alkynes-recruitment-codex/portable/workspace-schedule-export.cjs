@@ -26,6 +26,7 @@ function exportSchedule(dbPath,outputDir){
       const hydrated={version:1};
       const stmt=db.prepare('SELECT payload FROM records WHERE kind=? ORDER BY position');
       for(const kind of required)hydrated[kind]=stmt.all(kind).map(x=>JSON.parse(String(x.payload)));
+      if(data.fields.includes('requests'))hydrated.requests=stmt.all('requests').map(x=>JSON.parse(String(x.payload)));
       data=hydrated;
     }
   } finally {db.close();}
@@ -53,27 +54,32 @@ function exportSchedule(dbPath,outputDir){
     const part=[String(job.department||job.role||'채용').trim(),String(c.name||'지원자').trim()+' 면접'];
     return {id:String(i.id).slice(0,150),title:part.join(' · ').slice(0,250),startsAt:when.toISOString(),status:['면접예정','면접완료','확인 필요'].includes(i.status)?i.status:'확인 필요'};
   }).filter(Boolean);
-  // The recruitment app's IN PROGRESS people view is distinct from job vacancies.
-  // Export only candidates with an active, not-cancelled scheduled interview.
-  // Do not exclude past dates: a past appointment still labelled 면접예정 stays visible.
-  // No phone, email, resume, notes, or evaluation leaves the PC.
+  // The recruitment app's IN PROGRESS panel shows applicant-level scheduled
+  // processes, not all job vacancies. Include interviews and aptitude exams.
+  // Honour candidate's terminal Excel status even if old process records remain.
+  const requests=Array.isArray(data.requests)?data.requests:[];
   const inProgressCandidates=data.candidates.filter(c=>{
     const job=jobs.get(c.requisitionId);
-    return c&&c.id&&!c.excelMissing&&!c.privacyErasedAt&&job&&!job.excelMissing&&!closed.has(job.status)&&
-      !isEnded(c);
+    return c&&c.id&&!c.excelMissing&&!c.privacyErasedAt&&job&&!job.excelMissing&&!closed.has(job.status)&&!isEnded(c);
   }).map(c=>{
     const job=jobs.get(c.requisitionId);
     const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
       .sort((a,b)=>Date.parse(b.startsAt)-Date.parse(a.startsAt))[0];
-    if(!interview)return null;
+    const aptitude=requests.filter(q=>q&&q.candidateId===c.id&&q.stage==='인적성 검사 요청'&&
+      q.status!=='취소'&&q.examStatus!=='실시완료'&&q.examAt&&Number.isFinite(Date.parse(q.examAt)))
+      .sort((a,b)=>Date.parse(b.examAt)-Date.parse(a.examAt))[0];
+    const process=interview?{status:'면접예정',at:interview.startsAt,href:'/interviews?candidate='}:aptitude?
+      {status:'인적성 검사예정',at:aptitude.examAt,href:'/aptitudes'}:null;
+    if(!process)return null;
     return {
       id:String(c.id).slice(0,150),
       name:String(c.name||'지원자').slice(0,100),
       department:String(job.department||'').slice(0,100),
       role:String(job.role||'').slice(0,150),
       requisitionId:String(job.id).slice(0,150),
-      status:'면접예정',
-      interviewAt:new Date(interview.startsAt).toISOString()
+      status:process.status,
+      interviewAt:new Date(process.at).toISOString(),
+      processPath:process.href
     };
   }).filter(Boolean).sort((a,b)=>b.interviewAt.localeCompare(a.interviewAt));
   const payload={version:1,generatedAt:new Date().toISOString(),interviews:items,inProgressCandidates};
