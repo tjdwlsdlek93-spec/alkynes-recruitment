@@ -37,10 +37,17 @@ function exportSchedule(dbPath,outputDir){
   }
   const people=new Map(data.candidates.map(x=>[x.id,x]));
   const jobs=new Map(data.requisitions.map(x=>[x.id,x]));
+  // Match lib/candidate-state.ts endedCandidate(), including Excel fields.
+  // A stale interview may still say 면접예정 after Excel marks the person 전형종료/지원포기.
+  const compact=v=>String(v||'').replace(/\s+/g,'');
+  const ended=new Set(['서류불합격','불합격','지원포기','입사포기','실제입사','입사완료','전형종료','최종불합격']);
+  const isEnded=c=>!!c&&(ended.has(compact(c.status))||ended.has(compact(c.excelFinal))||
+    compact(c.excelStage)==='전형종료'||!!c.actualJoin);
+  const closed=new Set(['채용완료','채용취소','자체종결','채용보류']);
   const items=data.interviews.filter(i=>i&&i.id&&i.startsAt&&i.status!=='취소').map(i=>{
     const c=people.get(i.candidateId);
     const job=c?jobs.get(c.requisitionId):null;
-    if(!c||!job||c.privacyErasedAt||c.excelMissing||job.excelMissing)return null;
+    if(!c||!job||c.privacyErasedAt||c.excelMissing||job.excelMissing||closed.has(job.status)||isEnded(c))return null;
     const when=new Date(i.startsAt);
     if(!Number.isFinite(when.getTime()))return null;
     const part=[String(job.department||job.role||'채용').trim(),String(c.name||'지원자').trim()+' 면접'];
@@ -50,12 +57,10 @@ function exportSchedule(dbPath,outputDir){
   // Export only candidates with an active, not-cancelled scheduled interview.
   // Do not exclude past dates: a past appointment still labelled 면접예정 stays visible.
   // No phone, email, resume, notes, or evaluation leaves the PC.
-  const closed=new Set(['채용완료','채용취소','자체종결','채용보류']);
-  const ended=new Set(['서류불합격','불합격','지원포기','입사포기','실제 입사','전형종료']);
   const inProgressCandidates=data.candidates.filter(c=>{
     const job=jobs.get(c.requisitionId);
     return c&&c.id&&!c.excelMissing&&!c.privacyErasedAt&&job&&!job.excelMissing&&!closed.has(job.status)&&
-      !ended.has(c.status)&&!ended.has(c.excelFinal)&&!c.actualJoin;
+      !isEnded(c);
   }).map(c=>{
     const job=jobs.get(c.requisitionId);
     const interview=data.interviews.filter(i=>i&&i.candidateId===c.id&&i.status==='면접예정'&&i.startsAt&&Number.isFinite(Date.parse(i.startsAt)))
